@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment — .env.example is the committed template, .env never is
+.env
+.env.*
+!.env.example
+
+# Editor / OS cruft
+.DS_Store
+*.local

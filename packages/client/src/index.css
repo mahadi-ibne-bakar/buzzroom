@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/* ── Global resets ───────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #0f172a; /* slate-950 */
+  color: #f1f5f9; /* slate-100 */
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  /* Prevent double-tap zoom on mobile — critical for fast buzzer response */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent text selection during rapid tapping */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
