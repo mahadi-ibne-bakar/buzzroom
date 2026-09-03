@@ -1,9 +1,11 @@
 import type { BuzzPayload } from "@buzzroom/shared";
 import {
   checkBuzzCredentials,
+  createRound,
   processBuzz,
   getActiveEntry,
   toBuzzEntryView,
+  toRoundView,
 } from "../../rooms/round.js";
 import type { RoomStore } from "../../rooms/RoomStore.js";
 import type { TypedServer, TypedSocket } from "../../socketTypes.js";
@@ -26,11 +28,26 @@ export function onBuzz(
   const { room, player } = context;
 
   if (!room.round) {
-    socket.emit("server_error", {
-      code: "NO_ACTIVE_ROUND",
-      message: "No buzz round is currently active.",
+    // Under "free" the players may buzz before the host opens anything
+    // (spec §5), so the first buzz implicitly opens the round. There were no
+    // gesture parameters to broadcast in advance, so an implicitly opened
+    // round is always plain button mode.
+    if (room.settings.buzzWindowMode !== "free") {
+      socket.emit("server_error", {
+        code: "NO_ACTIVE_ROUND",
+        message: "No buzz round is currently active.",
+      });
+      return;
+    }
+
+    room.round = createRound("button");
+    io.to(room.roomId).emit("round_opened", {
+      round: toRoundView(room.round),
     });
-    return;
+    console.log(
+      `[round] free-buzz round opened by "${player.name}" in ${room.roomCode} ` +
+        `(id: ${room.round.roundId})`,
+    );
   }
 
   // Verify the buzz presents this round's gesture credentials before it is
@@ -68,6 +85,7 @@ export function onBuzz(
     payload.adjustedTime,
     room.settings.earlyBuzzPenalty,
     payload.mode,
+    room.settings.buzzWindowMode,
   );
 
   switch (result.type) {

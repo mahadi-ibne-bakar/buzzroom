@@ -46,8 +46,15 @@ export function useClockSync(
 
     const samples = samplesRef.current;
 
+    // The server can't measure RTT -- that needs t1, which only we see -- so
+    // each ping carries the previous round trip for the host's
+    // connection-quality display (spec §4).
     const ping = () => {
-      socket.emit("sync_ping", { t0: Date.now() });
+      const lastRtt = samples[samples.length - 1]?.rtt;
+      socket.emit("sync_ping", {
+        t0: Date.now(),
+        ...(lastRtt === undefined ? {} : { lastRtt: Math.round(lastRtt) }),
+      });
     };
 
     const handlePong = ({ t0, ts }: SyncPongPayload) => {

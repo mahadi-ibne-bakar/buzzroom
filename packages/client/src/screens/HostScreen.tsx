@@ -1,9 +1,12 @@
 import { useState } from "react";
-import type { BuzzMode } from "@buzzroom/shared";
+import type { BuzzMode, BuzzWindowMode } from "@buzzroom/shared";
 import { useGame } from "../contexts/GameContext.js";
 import { useSocket } from "../contexts/SocketContext.js";
+import { useClockSync } from "../hooks/useClockSync.js";
 import { BuzzOrder } from "../components/BuzzOrder.js";
+import { JoinQrCode } from "../components/JoinQrCode.js";
 import { Leaderboard } from "../components/Leaderboard.js";
+import { PingIndicator } from "../components/PingIndicator.js";
 
 const MODE_LABELS: Record<BuzzMode, string> = {
   button: "🔴 Button",
@@ -13,7 +16,11 @@ const MODE_LABELS: Record<BuzzMode, string> = {
 
 export function HostScreen() {
   const { state, dispatch } = useGame();
-  const { socket } = useSocket();
+  const { socket, connected } = useSocket();
+  // The host never buzzes, so they don't need the offset -- but syncing is
+  // what produces an RTT, and a blank connection dot for yourself in the
+  // player list is worse than useless. Idle cadence is enough.
+  useClockSync(socket, connected, false);
   const [selectedMode, setSelectedMode] = useState<BuzzMode>("button");
   const [awardTarget, setAwardTarget] = useState("");
   const [awardDelta, setAwardDelta] = useState("1");
@@ -23,8 +30,12 @@ export function HostScreen() {
   const [roundPoints, setRoundPoints] = useState("1");
   const [tab, setTab] = useState<"round" | "scores">("round");
 
-  const { room, myPlayerId, leaderboard, roundResult } = state;
+  const { room, myPlayerId, leaderboard, roundResult, pings } = state;
   if (!room) return null;
+
+  const settings = room.settings;
+  const setWindowMode = (buzzWindowMode: BuzzWindowMode) =>
+    socket.emit("update_settings", { buzzWindowMode });
 
   const round = room.round;
   const isRoundOpen = round?.status === "open";
@@ -85,11 +96,16 @@ export function HostScreen() {
             {connectedPlayers.map((p) => (
               <span
                 key={p.playerId}
-                className="bg-slate-700 text-white text-sm rounded-lg px-3 py-1"
+                className="bg-slate-700 text-white text-sm rounded-lg px-3 py-1 inline-flex items-center gap-2"
               >
+                <PingIndicator rttMs={pings[p.playerId] ?? p.rttMs} showMs />
                 {p.name} {p.playerId === myPlayerId ? "(you)" : ""}
               </span>
             ))}
+          </div>
+
+          <div className="mt-4 flex justify-center">
+            <JoinQrCode roomCode={room.roomCode} />
           </div>
         </div>
       )}
@@ -124,6 +140,55 @@ export function HostScreen() {
 
       {tab === "round" && (
         <div className="flex flex-col gap-4">
+          {/* Buzz window mode (spec §5) */}
+          <div className="bg-slate-800 rounded-2xl p-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-xs uppercase tracking-wider">
+                Buzz window
+              </span>
+              <div className="flex rounded-lg bg-slate-900 p-0.5 gap-0.5">
+                {(["locked", "free"] as BuzzWindowMode[]).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setWindowMode(m)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                      settings.buzzWindowMode === m
+                        ? "bg-slate-600 text-white"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {m === "locked" ? "🔒 Locked" : "⚡ Free"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-slate-500 text-xs">
+              {settings.buzzWindowMode === "locked"
+                ? "Buzzes only count while the window is open. Buzzing early earns a short lockout."
+                : "Players can buzz any time, before you open the round or after you close it. No early-buzz penalty."}
+            </p>
+            <label className="flex items-center gap-2 text-slate-400 text-xs">
+              <input
+                type="checkbox"
+                checked={settings.earlyBuzzPenalty}
+                disabled={settings.buzzWindowMode === "free"}
+                onChange={(e) =>
+                  socket.emit("update_settings", {
+                    earlyBuzzPenalty: e.target.checked,
+                  })
+                }
+                className="accent-indigo-500 disabled:opacity-40"
+              />
+              <span
+                className={
+                  settings.buzzWindowMode === "free" ? "opacity-40" : ""
+                }
+              >
+                Early-buzz penalty
+              </span>
+            </label>
+          </div>
+
           {/* Mode picker + open button */}
           {!isRoundOpen && (
             <div className="flex flex-col gap-3">
@@ -209,7 +274,11 @@ export function HostScreen() {
 
       {tab === "scores" && (
         <div className="flex flex-col gap-4">
-          <Leaderboard entries={leaderboard} myPlayerId={myPlayerId} />
+          <Leaderboard
+            entries={leaderboard}
+            myPlayerId={myPlayerId}
+            pings={pings}
+          />
 
           {/* Manual award */}
           <div className="bg-slate-800 rounded-2xl p-4 flex flex-col gap-3">

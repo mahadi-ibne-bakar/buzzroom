@@ -13,6 +13,15 @@ export function onOpenBuzz(
   const room = getHostRoom(socket, store);
   if (!room) return;
 
+  // Spec §11 lets open_buzz carry the window mode. Omitting it leaves the
+  // room on whatever the host last selected.
+  if (payload.buzzWindowMode !== undefined) {
+    store.updateSettings(room, { buzzWindowMode: payload.buzzWindowMode });
+    io.to(room.roomId).emit("settings_updated", {
+      settings: store.toSettingsView(room),
+    });
+  }
+
   // Silently replace any previous round rather than forcing the host to
   // reset first. The most common mistake is opening twice by accident;
   // erroring on it is annoying, discarding and restarting is the right UX.
@@ -25,6 +34,7 @@ export function onOpenBuzz(
 
   console.log(
     `[round] opened in ${room.roomCode} ` +
-      `(mode: ${room.round.modeParams.mode}, id: ${room.round.roundId})`,
+      `(mode: ${room.round.modeParams.mode}, ` +
+      `window: ${room.settings.buzzWindowMode}, id: ${room.round.roundId})`,
   );
 }

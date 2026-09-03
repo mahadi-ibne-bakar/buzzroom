@@ -1,11 +1,21 @@
 import { useState } from "react";
 import { useSocket } from "../contexts/SocketContext.js";
+import { parseRoomCodeFromSearch } from "../lib/joinLink.js";
 
 export function LandingScreen() {
   const { socket } = useSocket();
-  const [mode, setMode] = useState<"home" | "host" | "join">("home");
+  // A scanned QR code lands here as /?room=ABCDEF (see JoinQrCode). Read it
+  // once on first render so the join form opens pre-filled and the player
+  // only has to type a name.
+  const [scannedCode] = useState(() =>
+    parseRoomCodeFromSearch(window.location.search),
+  );
+
+  const [mode, setMode] = useState<"home" | "host" | "join">(
+    scannedCode ? "join" : "home",
+  );
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(scannedCode);
   const [busy, setBusy] = useState(false);
 
   const handleHost = () => {

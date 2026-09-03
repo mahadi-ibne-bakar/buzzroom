@@ -1,11 +1,14 @@
 import type { LeaderboardEntry } from "@buzzroom/shared";
+import { PingIndicator } from "./PingIndicator.js";
 
 interface Props {
   entries: LeaderboardEntry[];
   myPlayerId: string | null;
+  /** Latest RTT per playerId. Omit to hide the connection indicator. */
+  pings?: Record<string, number | null>;
 }
 
-export function Leaderboard({ entries, myPlayerId }: Props) {
+export function Leaderboard({ entries, myPlayerId, pings }: Props) {
   if (entries.length === 0) {
     return (
       <p className="text-slate-500 text-sm text-center py-4">No scores yet</p>
@@ -31,6 +34,9 @@ export function Leaderboard({ entries, myPlayerId }: Props) {
             {!entry.isConnected && " 📵"}
             {entry.playerId === myPlayerId && " (you)"}
           </span>
+          {pings && entry.isConnected && (
+            <PingIndicator rttMs={pings[entry.playerId]} showMs />
+          )}
           <span className="font-bold text-white">{entry.score}</span>
         </li>
       ))}

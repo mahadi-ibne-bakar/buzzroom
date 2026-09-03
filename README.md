@@ -24,14 +24,17 @@ apart.
 
 ## Status
 
-Feature-complete against the v1 scope in the spec, apart from the gaps listed
-below.
+Feature-complete against the v1 scope in the spec.
 
-- **Rooms** — create/join by 6-character code, name sanitising and duplicate
-  detection, a 20-player cap, and idle-room expiry.
+- **Rooms** — create/join by 6-character code or QR scan, name sanitising and
+  duplicate detection, a 20-player cap, and idle-room expiry.
 - **Rounds** — host opens, closes and resets the buzz window, works down the
   ranked queue marking answers correct or wrong, and sets what each question
   is worth.
+- **Buzz window** — per-room toggle between **locked** (a buzz only counts once
+  the host opens the window; buzzing early earns a lockout) and **free**
+  (players buzz whenever they like, including before the host opens anything —
+  the first buzz opens the round — with no penalty).
 - **Buzz-in modes** — button, slide and pattern. The gesture parameters are
   generated fresh every time the host opens a round and must be echoed back
   with the buzz, so no one can pre-practise the specific gesture.
@@ -39,20 +42,21 @@ below.
   ranking by latency-corrected `adjustedTime` rather than packet arrival,
   near-tie flagging within 50ms, and server-side clamping so a client cannot
   win by backdating its timestamp.
-- **Early-buzz penalty** — escalating lockout with a countdown on the player's
-  buzzer.
+- **Early-buzz penalty** — escalating lockout (0.5s → 1s → 1.5s) with a
+  countdown on the player's buzzer and a haptic nudge where supported. Applies
+  in locked mode only.
+- **Connection quality** — each client reports its measured round-trip time on
+  its next clock sync; the host sees a live per-player indicator and each
+  player sees their own.
 - **Scoring** — per-player scores, manual award/deduct, and a live leaderboard
   using standard competition ranking (1-1-3).
 - **Reconnect** — a player who drops comes back on the same `playerId` with
   their score and any buzz they already made intact; a host disconnect pauses
   the game rather than ending it.
 
-Not yet built, all v1 scope in the spec:
-
-- Free-buzz vs. locked buzz window (`RoomSettings` only has the early-buzz
-  penalty toggle)
-- QR code join — code entry only
-- Per-player ping indicator (`Player.lastRtt` is declared but never written)
+Deferred to post-v1 by the spec itself (§13): team mode, a separate presenter
+view, a native app wrapper, saved question banks, sound and theming, the
+audience agree/disagree mechanic, and multi-server scaling.
 
 ## Setup
 

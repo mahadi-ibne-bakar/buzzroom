@@ -3,10 +3,12 @@ import { useSocket } from "../contexts/SocketContext.js";
 import { useClockSync } from "../hooks/useClockSync.js";
 import { BuzzOrder } from "../components/BuzzOrder.js";
 import { Leaderboard } from "../components/Leaderboard.js";
+import { PingIndicator } from "../components/PingIndicator.js";
 import { ButtonBuzzer } from "../components/buzz/ButtonBuzzer.js";
 import { SlideBuzzer } from "../components/buzz/SlideBuzzer.js";
 import { PatternBuzzer } from "../components/buzz/PatternBuzzer.js";
 import { useEffect, useState } from "react";
+import type { ModeParams } from "@buzzroom/shared";
 import { buildBuzzPayload } from "../lib/buildBuzzPayload.js";
 
 /**
@@ -33,8 +35,9 @@ export function PlayerScreen() {
   const { socket, connected } = useSocket();
   const [tab, setTab] = useState<"buzz" | "scores">("buzz");
 
-  const { room, myPlayerId, leaderboard, roundResult, lockout } = state;
+  const { room, myPlayerId, leaderboard, roundResult, lockout, pings } = state;
   const roundOpen = room?.round?.status === "open";
+  const freeBuzz = room?.settings.buzzWindowMode === "free";
 
   // Sync harder while a round is live; see spec §7.1.
   const offsetRef = useClockSync(socket, connected, roundOpen);
@@ -46,16 +49,29 @@ export function PlayerScreen() {
   const myEntry = round?.buzzOrder.find((e) => e.playerId === myPlayerId);
   const myRank = myEntry && !myEntry.eliminated ? myEntry.rank : null;
   const buzzedIn = myEntry !== undefined;
-  const buzzerDisabled = !roundOpen || buzzedIn || lockoutSecondsLeft !== null;
+  // A real buzzer is always pressable; whether the press *counts* is the
+  // server's call. Under "free" it always counts. Under "locked" a press on a
+  // closed round is what earns the early-buzz penalty (spec §5) -- greying the
+  // button out instead would make the penalty, and the whole locked/free
+  // distinction, invisible to the player.
+  //
+  // The exceptions are a resolved round (the question is over) and, under
+  // "locked", no round at all: the server has no round to hang a lockout on,
+  // so there is nothing to press yet.
+  const pressable = roundResult === null && (freeBuzz || round !== null);
+  const buzzerDisabled = !pressable || buzzedIn || lockoutSecondsLeft !== null;
 
   const myPlayer = room.players.find((p) => p.playerId === myPlayerId);
 
   // Build and emit the buzz payload for the current mode
   const handleBuzz = (localTime: number) => {
-    if (!round) return;
+    // With no round open this is a free-buzz opener: the server implicitly
+    // opens a plain button round on the first buzz, because there were no
+    // gesture parameters to broadcast in advance.
+    const modeParams: ModeParams = round?.modeParams ?? { mode: "button" };
     socket.emit(
       "buzz",
-      buildBuzzPayload(round.modeParams, localTime, offsetRef.current),
+      buildBuzzPayload(modeParams, localTime, offsetRef.current),
     );
   };
 
@@ -64,7 +80,13 @@ export function PlayerScreen() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-slate-400 text-xs">{room.roomCode}</div>
+          <div className="text-slate-400 text-xs flex items-center gap-2">
+            {room.roomCode}
+            <PingIndicator
+              rttMs={myPlayerId ? (pings[myPlayerId] ?? myPlayer?.rttMs) : null}
+              showMs
+            />
+          </div>
           <div className="text-white font-semibold">
             {myPlayer?.name ?? "Player"}
           </div>
@@ -132,11 +154,25 @@ export function PlayerScreen() {
 
       {tab === "buzz" && (
         <div className="flex flex-col items-center gap-6 flex-1 justify-center py-4">
-          {!round && (
+          {!round && !freeBuzz && (
             <div className="text-slate-500 text-center">
               <div className="text-4xl mb-3">⏳</div>
               <div>Waiting for the host to open a round…</div>
             </div>
+          )}
+
+          {!round && freeBuzz && (
+            <>
+              <p className="text-slate-400 text-sm text-center">
+                ⚡ Free buzz — go whenever you're ready
+              </p>
+              <ButtonBuzzer
+                onBuzz={handleBuzz}
+                disabled={buzzerDisabled}
+                myRank={myRank}
+                lockoutSecondsLeft={lockoutSecondsLeft}
+              />
+            </>
           )}
 
           {round && (

@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { PlayerView, RoomView } from "@buzzroom/shared";
+import type {
+  BuzzWindowMode,
+  PlayerView,
+  RoomSettingsView,
+  RoomView,
+} from "@buzzroom/shared";
 import { generateRoomCode } from "./generateRoomCode.js";
 import type { Round } from "./round.js";
 import { toRoundView } from "./round.js";
@@ -7,6 +12,9 @@ import { toRoundView } from "./round.js";
 // ---------- Internal server-side models ----------
 
 export interface RoomSettings {
+  // "locked" (default) means a buzz only counts once the host opens the
+  // window; "free" means players may buzz whenever they like. See spec §5.
+  buzzWindowMode: BuzzWindowMode;
   earlyBuzzPenalty: boolean; // default on; penalises buzzing during closed rounds
 }
 
@@ -32,6 +40,9 @@ export interface Room {
   round: Round | null; // null = no active buzz round
   createdAt: number;
   lastActivityAt: number;
+  // Throttle for ping_update broadcasts. Players sync every few seconds each,
+  // so without this a 20-player room would fan out a broadcast per ping.
+  lastPingBroadcastAt: number;
 }
 
 // ---------- RoomStore ----------
@@ -77,10 +88,11 @@ export class RoomStore {
       hostPlayerId: playerId,
       hostSocketId,
       players: new Map([[playerId, player]]),
-      settings: { earlyBuzzPenalty: true },
+      settings: { buzzWindowMode: "locked", earlyBuzzPenalty: true },
       round: null,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
+      lastPingBroadcastAt: 0,
     };
 
     this.rooms.set(roomId, room);
@@ -262,6 +274,7 @@ export class RoomStore {
       name: player.name,
       score: player.score,
       isConnected: player.isConnected,
+      rttMs: player.lastRtt,
     };
   }
 
@@ -273,8 +286,33 @@ export class RoomStore {
       players: Array.from(room.players.values()).map((p) =>
         this.toPlayerView(p),
       ),
+      settings: this.toSettingsView(room),
       round: room.round ? toRoundView(room.round) : null,
     };
+  }
+
+  toSettingsView(room: Room): RoomSettingsView {
+    return {
+      buzzWindowMode: room.settings.buzzWindowMode,
+      earlyBuzzPenalty: room.settings.earlyBuzzPenalty,
+    };
+  }
+
+  // ---------- Settings ----------
+
+  /**
+   * Applies a partial settings change. Undefined fields are left alone, so
+   * callers can send a single toggle without restating the rest.
+   */
+  updateSettings(room: Room, patch: Partial<RoomSettings>): RoomSettings {
+    if (patch.buzzWindowMode !== undefined) {
+      room.settings.buzzWindowMode = patch.buzzWindowMode;
+    }
+    if (patch.earlyBuzzPenalty !== undefined) {
+      room.settings.earlyBuzzPenalty = patch.earlyBuzzPenalty;
+    }
+    room.lastActivityAt = Date.now();
+    return room.settings;
   }
 
   // ---------- Activity & cleanup ----------

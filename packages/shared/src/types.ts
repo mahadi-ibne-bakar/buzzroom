@@ -3,6 +3,24 @@ export interface PlayerView {
   name: string;
   score: number;
   isConnected: boolean;
+  // Last round-trip time this player reported, in ms. Only the client can
+  // measure it (the calculation needs its own receive time), so it rides
+  // along on the next sync_ping. null until that first report lands.
+  rttMs: number | null;
+}
+
+/**
+ * Whether a buzz only counts once the host has opened the window.
+ *
+ * "locked"  buzzing before the round opens earns an early-buzz penalty.
+ * "free"    players may buzz whenever they like, including before the host
+ *           opens anything and after they close it. No penalty applies.
+ */
+export type BuzzWindowMode = "free" | "locked";
+
+export interface RoomSettingsView {
+  buzzWindowMode: BuzzWindowMode;
+  earlyBuzzPenalty: boolean;
 }
 
 export type BuzzMode = "button" | "slide" | "pattern";
@@ -46,5 +64,6 @@ export interface RoomView {
   roomCode: string;
   hostPlayerId: string;
   players: PlayerView[];
+  settings: RoomSettingsView;
   round: RoundView | null;
 }

@@ -7,6 +7,7 @@ import {
   OpenBuzzPayloadSchema,
   ReconnectRoomPayloadSchema,
   SyncPingPayloadSchema,
+  UpdateSettingsPayloadSchema,
 } from "@buzzroom/shared";
 import type { RoomStore } from "../rooms/RoomStore.js";
 import type { TypedServer } from "../socketTypes.js";
@@ -21,6 +22,7 @@ import { onOpenBuzz } from "./handlers/onOpenBuzz.js";
 import { onReconnect } from "./handlers/onReconnect.js";
 import { onResetRound } from "./handlers/onResetRound.js";
 import { onSyncPing } from "./handlers/onSyncPing.js";
+import { onUpdateSettings } from "./handlers/onUpdateSettings.js";
 import { SocketRateLimiter } from "./rateLimiter.js";
 
 export function registerSocketHandlers(
@@ -128,10 +130,17 @@ export function registerSocketHandlers(
       if (!rateCheck("sync_ping", 60)) return;
       const data = validate(SyncPingPayloadSchema, payload);
       if (!data) return;
-      onSyncPing(socket, store, data);
+      onSyncPing(io, socket, store, data);
     });
 
     // ── Phase 6: scoring ──────────────────────────────────────────────────
+
+    socket.on("update_settings", (payload) => {
+      if (!rateCheck("update_settings", 60)) return;
+      const data = validate(UpdateSettingsPayloadSchema, payload);
+      if (!data) return;
+      onUpdateSettings(io, socket, store, data);
+    });
 
     socket.on("award_points", (payload) => {
       if (!rateCheck("award_points", 60)) return;

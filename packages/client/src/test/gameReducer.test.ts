@@ -17,6 +17,7 @@ const initial: GameState = {
   hostGone: false,
   roundResult: null,
   lockout: null,
+  pings: {},
 };
 
 function makeRoom(overrides: Partial<RoomView> = {}): RoomView {
@@ -24,8 +25,15 @@ function makeRoom(overrides: Partial<RoomView> = {}): RoomView {
     roomId: "room-1",
     roomCode: "ABCDEF",
     hostPlayerId: "host-1",
+    settings: { buzzWindowMode: "locked", earlyBuzzPenalty: true },
     players: [
-      { playerId: "host-1", name: "Host", score: 0, isConnected: true },
+      {
+        playerId: "host-1",
+        name: "Host",
+        score: 0,
+        isConnected: true,
+        rttMs: null,
+      },
     ],
     round: null,
     ...overrides,
@@ -68,8 +76,20 @@ describe("JOINED", () => {
   it("switches to player screen for non-hosts", () => {
     const room = makeRoom({
       players: [
-        { playerId: "host-1", name: "Host", score: 0, isConnected: true },
-        { playerId: "p2", name: "Alice", score: 0, isConnected: true },
+        {
+          playerId: "host-1",
+          name: "Host",
+          score: 0,
+          isConnected: true,
+          rttMs: null,
+        },
+        {
+          playerId: "p2",
+          name: "Alice",
+          score: 0,
+          isConnected: true,
+          rttMs: null,
+        },
       ],
     });
     const next = dispatch(initial, { type: "JOINED", room, myPlayerId: "p2" });
@@ -90,7 +110,13 @@ describe("PLAYER_JOINED", () => {
     };
     const next = dispatch(state, {
       type: "PLAYER_JOINED",
-      player: { playerId: "p2", name: "Alice", score: 0, isConnected: true },
+      player: {
+        playerId: "p2",
+        name: "Alice",
+        score: 0,
+        isConnected: true,
+        rttMs: null,
+      },
     });
     expect(next.room?.players).toHaveLength(2);
     expect(next.room?.players[1]?.name).toBe("Alice");
@@ -99,8 +125,20 @@ describe("PLAYER_JOINED", () => {
   it("updates an existing player (reconnect case)", () => {
     const room = makeRoom({
       players: [
-        { playerId: "host-1", name: "Host", score: 0, isConnected: true },
-        { playerId: "p2", name: "Alice", score: 3, isConnected: false },
+        {
+          playerId: "host-1",
+          name: "Host",
+          score: 0,
+          isConnected: true,
+          rttMs: null,
+        },
+        {
+          playerId: "p2",
+          name: "Alice",
+          score: 3,
+          isConnected: false,
+          rttMs: null,
+        },
       ],
     });
     const state: GameState = {
@@ -111,7 +149,13 @@ describe("PLAYER_JOINED", () => {
     };
     const next = dispatch(state, {
       type: "PLAYER_JOINED",
-      player: { playerId: "p2", name: "Alice", score: 3, isConnected: true },
+      player: {
+        playerId: "p2",
+        name: "Alice",
+        score: 3,
+        isConnected: true,
+        rttMs: null,
+      },
     });
     expect(next.room?.players).toHaveLength(2);
     expect(
@@ -126,8 +170,20 @@ describe("PLAYER_LEFT", () => {
   it("marks the player as disconnected", () => {
     const room = makeRoom({
       players: [
-        { playerId: "host-1", name: "Host", score: 0, isConnected: true },
-        { playerId: "p2", name: "Alice", score: 0, isConnected: true },
+        {
+          playerId: "host-1",
+          name: "Host",
+          score: 0,
+          isConnected: true,
+          rttMs: null,
+        },
+        {
+          playerId: "p2",
+          name: "Alice",
+          score: 0,
+          isConnected: true,
+          rttMs: null,
+        },
       ],
     });
     const state: GameState = {
@@ -260,7 +316,13 @@ describe("SCORE_UPDATED", () => {
     const next = dispatch(state, {
       type: "SCORE_UPDATED",
       players: [
-        { playerId: "host-1", name: "Host", score: 5, isConnected: true },
+        {
+          playerId: "host-1",
+          name: "Host",
+          score: 5,
+          isConnected: true,
+          rttMs: null,
+        },
       ],
       leaderboard: [
         {
@@ -317,8 +379,20 @@ describe("hostGone", () => {
     screen: "player",
     room: makeRoom({
       players: [
-        { playerId: "host-1", name: "Host", score: 0, isConnected: false },
-        { playerId: "p2", name: "Alice", score: 0, isConnected: true },
+        {
+          playerId: "host-1",
+          name: "Host",
+          score: 0,
+          isConnected: false,
+          rttMs: null,
+        },
+        {
+          playerId: "p2",
+          name: "Alice",
+          score: 0,
+          isConnected: true,
+          rttMs: null,
+        },
       ],
     }),
     myPlayerId: "p2",
@@ -328,7 +402,13 @@ describe("hostGone", () => {
   it("stays set when a non-host player rejoins", () => {
     const next = dispatch(joined, {
       type: "PLAYER_JOINED",
-      player: { playerId: "p3", name: "Bob", score: 0, isConnected: true },
+      player: {
+        playerId: "p3",
+        name: "Bob",
+        score: 0,
+        isConnected: true,
+        rttMs: null,
+      },
     });
     expect(next.hostGone).toBe(true);
   });
@@ -336,7 +416,13 @@ describe("hostGone", () => {
   it("clears when the host themselves rejoins", () => {
     const next = dispatch(joined, {
       type: "PLAYER_JOINED",
-      player: { playerId: "host-1", name: "Host", score: 0, isConnected: true },
+      player: {
+        playerId: "host-1",
+        name: "Host",
+        score: 0,
+        isConnected: true,
+        rttMs: null,
+      },
     });
     expect(next.hostGone).toBe(false);
   });
@@ -428,5 +514,66 @@ describe("EARLY_BUZZ_PENALTY", () => {
     });
 
     expect(next.lockout).toBeNull();
+  });
+});
+
+// ── SETTINGS_UPDATED ──────────────────────────────────────────────────────
+
+describe("SETTINGS_UPDATED", () => {
+  it("replaces the room's settings", () => {
+    const joined: GameState = {
+      ...initial,
+      screen: "player",
+      room: makeRoom(),
+      myPlayerId: "p2",
+    };
+
+    const next = dispatch(joined, {
+      type: "SETTINGS_UPDATED",
+      settings: { buzzWindowMode: "free", earlyBuzzPenalty: false },
+    });
+
+    expect(next.room?.settings.buzzWindowMode).toBe("free");
+    expect(next.room?.settings.earlyBuzzPenalty).toBe(false);
+  });
+
+  it("is a no-op before a room exists", () => {
+    const next = dispatch(initial, {
+      type: "SETTINGS_UPDATED",
+      settings: { buzzWindowMode: "free", earlyBuzzPenalty: true },
+    });
+    expect(next).toBe(initial);
+  });
+});
+
+// ── PING_UPDATE ───────────────────────────────────────────────────────────
+
+describe("PING_UPDATE", () => {
+  it("indexes the reported round-trip times by playerId", () => {
+    const next = dispatch(initial, {
+      type: "PING_UPDATE",
+      pings: [
+        { playerId: "host-1", rttMs: 12 },
+        { playerId: "p2", rttMs: null },
+      ],
+    });
+
+    expect(next.pings).toEqual({ "host-1": 12, p2: null });
+  });
+
+  it("replaces the previous snapshot rather than merging into it", () => {
+    // The server sends every player each time, so a stale entry for someone
+    // who has since left must not linger.
+    const withPings: GameState = {
+      ...initial,
+      pings: { "host-1": 12, gone: 99 },
+    };
+
+    const next = dispatch(withPings, {
+      type: "PING_UPDATE",
+      pings: [{ playerId: "host-1", rttMs: 15 }],
+    });
+
+    expect(next.pings).toEqual({ "host-1": 15 });
   });
 });

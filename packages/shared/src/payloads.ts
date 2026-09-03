@@ -16,6 +16,9 @@ export type JoinRoomPayload = z.infer<typeof JoinRoomPayloadSchema>;
 
 export const OpenBuzzPayloadSchema = z.object({
   buzzMode: z.enum(["button", "slide", "pattern"]),
+  // Spec section 11 carries the window mode on open_buzz. Optional: omitting
+  // it leaves the room on whatever mode it is already set to.
+  buzzWindowMode: z.enum(["free", "locked"]).optional(),
 });
 export type OpenBuzzPayload = z.infer<typeof OpenBuzzPayloadSchema>;
 
@@ -27,6 +30,10 @@ export type AdvanceQueuePayload = z.infer<typeof AdvanceQueuePayloadSchema>;
 
 export const SyncPingPayloadSchema = z.object({
   t0: z.number().int().positive(),
+  // Round-trip time the client measured on its previous sync, piggybacked so
+  // the host can show a connection-quality indicator per player (spec
+  // section 4). Absent on the very first ping, before there is one to report.
+  lastRtt: z.number().int().min(0).max(60_000).optional(),
 });
 export type SyncPingPayload = z.infer<typeof SyncPingPayloadSchema>;
 
@@ -71,3 +78,15 @@ export const ReconnectRoomPayloadSchema = z.object({
     .transform((s) => s.toUpperCase()),
 });
 export type ReconnectRoomPayload = z.infer<typeof ReconnectRoomPayloadSchema>;
+
+// Both fields optional: a settings update is a patch, and the host UI toggles
+// one control at a time.
+export const UpdateSettingsPayloadSchema = z
+  .object({
+    buzzWindowMode: z.enum(["free", "locked"]).optional(),
+    earlyBuzzPenalty: z.boolean().optional(),
+  })
+  .refine((p) => Object.values(p).some((v) => v !== undefined), {
+    message: "at least one setting must be provided",
+  });
+export type UpdateSettingsPayload = z.infer<typeof UpdateSettingsPayloadSchema>;

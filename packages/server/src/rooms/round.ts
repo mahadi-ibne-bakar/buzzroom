@@ -2,6 +2,7 @@ import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import type {
   BuzzMode,
   BuzzEntryView,
+  BuzzWindowMode,
   ModeParams,
   RoundView,
 } from "@buzzroom/shared";
@@ -260,9 +261,18 @@ export function processBuzz(
   adjustedTime: number,
   earlyPenaltyEnabled: boolean,
   mode: BuzzMode,
+  windowMode: BuzzWindowMode,
 ): BuzzResult {
+  // ── Already answered ──
+  // A resolved round is over whatever the window mode says: the host has
+  // marked someone correct and moved on, so there is nothing to buzz into.
+  if (round.resolved) return { type: "round_closed" };
+
   // ── Round is closed ──
-  if (round.status === "closed") {
+  // Only "locked" actually shuts the window. Under "free" a closed round
+  // still accepts buzzes and no penalty applies -- that is the whole point
+  // of the mode (spec §5) -- so fall through to the normal path.
+  if (round.status === "closed" && windowMode === "locked") {
     if (!earlyPenaltyEnabled) return { type: "round_closed" };
 
     const existing = round.lockouts.get(playerId);
@@ -277,7 +287,7 @@ export function processBuzz(
     return { type: "penalty_applied", lockedForMs, offenseCount };
   }
 
-  // ── Round is open ──
+  // ── Buzz is accepted into the order ──
 
   if (round.buzzOrder.some((e) => e.playerId === playerId)) {
     return { type: "already_buzzed" };

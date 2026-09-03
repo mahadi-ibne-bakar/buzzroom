@@ -25,3 +25,10 @@ export const MAX_CLOCK_SKEW_MS = 2_000;
 export const PATTERN_DOT_COUNT = 9;
 export const PATTERN_MIN_LENGTH = 4;
 export const PATTERN_MAX_LENGTH = 6;
+
+// ── Connection quality ────────────────────────────────────────────────────
+
+// Most a room will fan out ping_update. Each player syncs on their own
+// heartbeat, so without coalescing a full room would broadcast several times
+// a second to show a number that changes by a few milliseconds.
+export const PING_BROADCAST_INTERVAL_MS = 2_000;

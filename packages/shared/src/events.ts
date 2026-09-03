@@ -7,11 +7,13 @@ import type {
   OpenBuzzPayload,
   ReconnectRoomPayload,
   SyncPingPayload,
+  UpdateSettingsPayload,
 } from "./payloads.js";
 import type {
   BuzzEntryView,
   LeaderboardEntry,
   PlayerView,
+  RoomSettingsView,
   RoomView,
   RoundView,
 } from "./types.js";
@@ -56,6 +58,12 @@ export interface SyncPongPayload {
   t0: number;
   ts: number;
 }
+export interface SettingsUpdatedPayload {
+  settings: RoomSettingsView;
+}
+export interface PingUpdatePayload {
+  pings: { playerId: string; rttMs: number | null }[];
+}
 export interface ReconnectOkPayload {
   room: RoomView;
   yourPlayerId: string;
@@ -75,7 +83,12 @@ export interface ServerErrorPayload {
   message: string;
 }
 
-export type { RoundView, ModeParams } from "./types.js";
+export type {
+  RoundView,
+  ModeParams,
+  BuzzWindowMode,
+  RoomSettingsView,
+} from "./types.js";
 
 export interface ServerToClientEvents {
   room_created: (p: RoomCreatedPayload) => void;
@@ -90,6 +103,8 @@ export interface ServerToClientEvents {
   round_resolved: (p: RoundResolvedPayload) => void;
   score_update: (p: ScoreUpdatePayload) => void;
   sync_pong: (p: SyncPongPayload) => void;
+  settings_updated: (p: SettingsUpdatedPayload) => void;
+  ping_update: (p: PingUpdatePayload) => void;
   host_left: () => void;
   reconnect_ok: (p: ReconnectOkPayload) => void;
   server_error: (p: ServerErrorPayload) => void;
@@ -106,4 +121,5 @@ export interface ClientToServerEvents {
   sync_ping: (p: SyncPingPayload) => void;
   award_points: (p: AwardPointsPayload) => void;
   reconnect_room: (p: ReconnectRoomPayload) => void;
+  update_settings: (p: UpdateSettingsPayload) => void;
 }

@@ -10,6 +10,7 @@ import type {
   BuzzOrderUpdatedPayload,
   EarlyBuzzPenaltyPayload,
   JoinOkPayload,
+  PingUpdatePayload,
   LeaderboardEntry,
   ModeParams,
   PlayerJoinedPayload,
@@ -17,12 +18,14 @@ import type {
   PlayerView,
   ReconnectOkPayload,
   RoomCreatedPayload,
+  RoomSettingsView,
   RoomView,
   RoundOpenedPayload,
   RoundResolvedPayload,
   RoundView,
   ScoreUpdatePayload,
   ServerErrorPayload,
+  SettingsUpdatedPayload,
 } from "@buzzroom/shared";
 import { useSocket } from "./SocketContext.js";
 
@@ -44,6 +47,10 @@ export interface GameState {
   // epoch-ms deadline, so components can render a countdown without asking
   // the server again.
   lockout: { until: number; offenseCount: number } | null;
+  // Latest round-trip time per playerId, as reported by each client and fanned
+  // out by the server. Kept out of `room.players` so a ping refresh every
+  // couple of seconds doesn't churn the player list.
+  pings: Record<string, number | null>;
 }
 
 const initial: GameState = {
@@ -55,6 +62,7 @@ const initial: GameState = {
   hostGone: false,
   roundResult: null,
   lockout: null,
+  pings: {},
 };
 
 // ── Actions ───────────────────────────────────────────────────────────────
@@ -86,6 +94,8 @@ export type GameAction =
       pointsAwarded: number;
     }
   | { type: "EARLY_BUZZ_PENALTY"; lockedForMs: number; offenseCount: number }
+  | { type: "SETTINGS_UPDATED"; settings: RoomSettingsView }
+  | { type: "PING_UPDATE"; pings: PingUpdatePayload["pings"] }
   | { type: "ERROR"; message: string }
   | { type: "CLEAR_ERROR" }
   | { type: "LEAVE" };
@@ -226,6 +236,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         },
       };
 
+    case "SETTINGS_UPDATED":
+      if (!state.room) return state;
+      return {
+        ...state,
+        room: { ...state.room, settings: action.settings },
+      };
+
+    case "PING_UPDATE":
+      return {
+        ...state,
+        pings: Object.fromEntries(
+          action.pings.map((p) => [p.playerId, p.rttMs]),
+        ),
+      };
+
     case "ERROR":
       return { ...state, errorMessage: action.message };
 
@@ -317,6 +342,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
         navigator.vibrate?.(200);
         dispatch({ type: "EARLY_BUZZ_PENALTY", lockedForMs, offenseCount });
       },
+      settings_updated: ({ settings }: SettingsUpdatedPayload) =>
+        dispatch({ type: "SETTINGS_UPDATED", settings }),
+      ping_update: ({ pings }: PingUpdatePayload) =>
+        dispatch({ type: "PING_UPDATE", pings }),
       server_error: ({ message }: ServerErrorPayload) =>
         dispatch({ type: "ERROR", message }),
     } as const;
