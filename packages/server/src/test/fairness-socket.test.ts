@@ -79,14 +79,18 @@ describe("sync_ping / sync_pong", () => {
     expect(p.ts).toBeLessThan(t0 + 2_000);
   });
 
-  it("RTT computed from pong is positive and plausible", async () => {
+  it("RTT computed from pong is non-negative and plausible", async () => {
     const client = await makeClient();
     const t0 = Date.now();
     const pong = waitForEvent<SyncPongPayload>(client, "sync_pong");
     client.emit("sync_ping", { t0 });
     const p = await pong;
     const t1 = Date.now();
-    expect(t1 - p.t0).toBeGreaterThan(0);
+    // Date.now() has millisecond resolution and this round trip is over
+    // loopback, so a genuine RTT of 0 is normal -- asserting > 0 here made
+    // the test flaky. What matters is that time never runs backwards and
+    // the round trip stays within a sane bound.
+    expect(t1 - p.t0).toBeGreaterThanOrEqual(0);
     expect(t1 - p.t0).toBeLessThan(2_000);
   });
 });
