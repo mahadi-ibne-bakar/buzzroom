@@ -24,6 +24,7 @@ export function onOpenBuzz(
   });
 
   console.log(
-    `[round] opened in ${room.roomCode} (mode: ${payload.buzzMode}, id: ${room.round.roundId})`,
+    `[round] opened in ${room.roomCode} ` +
+      `(mode: ${room.round.modeParams.mode}, id: ${room.round.roundId})`,
   );
 }

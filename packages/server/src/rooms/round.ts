@@ -1,6 +1,17 @@
-import { randomUUID } from "node:crypto";
-import type { BuzzEntryView, RoundView } from "@buzzroom/shared";
-import { NEAR_TIE_THRESHOLD_MS, MAX_CLOCK_SKEW_MS } from "../constants.js";
+import { randomBytes, randomInt, randomUUID } from "node:crypto";
+import type {
+  BuzzMode,
+  BuzzEntryView,
+  ModeParams,
+  RoundView,
+} from "@buzzroom/shared";
+import {
+  NEAR_TIE_THRESHOLD_MS,
+  MAX_CLOCK_SKEW_MS,
+  PATTERN_MIN_LENGTH,
+  PATTERN_MAX_LENGTH,
+  PATTERN_DOT_COUNT,
+} from "../constants.js";
 
 // ── Internal server-side types ────────────────────────────────────────────
 
@@ -12,6 +23,7 @@ export interface BuzzEntry {
   adjustedTime: number; // client's latency-corrected estimate of true press time
   eliminated: boolean;
   nearTie: boolean; // within NEAR_TIE_THRESHOLD_MS of an adjacent entry
+  mode: BuzzMode; // the input mode this buzz was made with
 }
 
 export interface EarlyBuzzLockout {
@@ -21,7 +33,9 @@ export interface EarlyBuzzLockout {
 
 export interface Round {
   roundId: string;
-  buzzMode: "button";
+  // The generated parameters for this round's input mode. Regenerated on
+  // every open (see createRound) so a gesture can never be pre-practised.
+  modeParams: ModeParams;
   status: "open" | "closed";
   openedAtServerTime: number;
   buzzOrder: BuzzEntry[];
@@ -30,10 +44,60 @@ export interface Round {
 
 // ── Factory ───────────────────────────────────────────────────────────────
 
-export function createRound(buzzMode: "button"): Round {
+/**
+ * Builds the parameters a player needs in order to perform this round's
+ * gesture, fresh every time.
+ *
+ * The token is the anti-pre-practice device required by the spec (§6): the
+ * slide and pattern parameters must be "generated and broadcast to every
+ * player at the exact instant the host opens that round -- never reusable
+ * from a previous round". Because a buzz must echo back the token issued
+ * for the round it claims to belong to, a client cannot queue up a buzz
+ * before the round opens, and cannot replay a buzz captured from an
+ * earlier round.
+ */
+function generateModeParams(mode: BuzzMode): ModeParams {
+  switch (mode) {
+    case "button":
+      // A flat button has no gesture to practise, so there is nothing to
+      // parameterise and no token to check.
+      return { mode: "button" };
+
+    case "slide":
+      return { mode: "slide", token: randomBytes(16).toString("hex") };
+
+    case "pattern":
+      return {
+        mode: "pattern",
+        token: randomBytes(16).toString("hex"),
+        sequence: generatePatternSequence(),
+      };
+  }
+}
+
+/**
+ * A random walk over distinct dots of the 3x3 grid, PATTERN_MIN_LENGTH to
+ * PATTERN_MAX_LENGTH long. Dots never repeat -- a phone-style lock pattern
+ * cannot revisit a dot, and repeats would also make the client's
+ * "next expected dot" hint ambiguous.
+ */
+function generatePatternSequence(): number[] {
+  const dots = Array.from({ length: PATTERN_DOT_COUNT }, (_, i) => i);
+
+  // Fisher-Yates, using randomInt for a uniform shuffle.
+  for (let i = dots.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [dots[i], dots[j]] = [dots[j]!, dots[i]!];
+  }
+
+  const length = randomInt(PATTERN_MIN_LENGTH, PATTERN_MAX_LENGTH + 1);
+  return dots.slice(0, length);
+}
+
+export function createRound(mode: BuzzMode): Round {
   return {
     roundId: randomUUID(),
-    buzzMode,
+    modeParams: generateModeParams(mode),
     status: "open",
     openedAtServerTime: Date.now(),
     buzzOrder: [],
@@ -109,6 +173,57 @@ function reRankAndDetectTies(buzzOrder: BuzzEntry[]): void {
   }
 }
 
+// ── Gesture credentials ───────────────────────────────────────────────────
+
+export type CredentialCheck =
+  | { ok: true }
+  | { ok: false; reason: "wrong_mode" | "bad_token" | "bad_sequence" };
+
+/**
+ * Verifies that a buzz actually presents this round's gesture credentials.
+ *
+ * The buzz payload is a discriminated union: slide carries a token, pattern
+ * carries a token and the sequence the player traced. Both were issued when
+ * the host opened this specific round. Checking them here is what stops a
+ * client from skipping the gesture entirely and emitting a raw "buzz" event,
+ * or replaying credentials captured from an earlier round.
+ *
+ * This is a fairness check, not a security boundary -- a determined player
+ * can still read the token out of their own round_opened payload and script
+ * the buzz. What it guarantees is that everyone is answering the same freshly
+ * generated challenge, which is exactly what the spec (§6) asks for.
+ */
+export function checkBuzzCredentials(
+  round: Round,
+  payload: {
+    mode: BuzzMode;
+    token?: string;
+    sequence?: number[];
+  },
+): CredentialCheck {
+  const params = round.modeParams;
+
+  if (payload.mode !== params.mode) return { ok: false, reason: "wrong_mode" };
+
+  // A button round issues no token, so there is nothing further to check.
+  if (params.mode === "button") return { ok: true };
+
+  if (payload.token !== params.token) return { ok: false, reason: "bad_token" };
+
+  if (params.mode === "pattern") {
+    const traced = payload.sequence;
+    if (
+      traced === undefined ||
+      traced.length !== params.sequence.length ||
+      traced.some((dot, i) => dot !== params.sequence[i])
+    ) {
+      return { ok: false, reason: "bad_sequence" };
+    }
+  }
+
+  return { ok: true };
+}
+
 // ── Buzz processing ───────────────────────────────────────────────────────
 
 const PENALTY_DURATIONS_MS = [500, 1_000, 1_500] as const;
@@ -139,6 +254,7 @@ export function processBuzz(
   serverTime: number,
   adjustedTime: number,
   earlyPenaltyEnabled: boolean,
+  mode: BuzzMode,
 ): BuzzResult {
   // ── Round is closed ──
   if (round.status === "closed") {
@@ -185,6 +301,7 @@ export function processBuzz(
     adjustedTime: safeAdjustedTime,
     eliminated: false,
     nearTie: false,
+    mode,
   };
 
   round.buzzOrder.push(entry);
@@ -231,6 +348,7 @@ export function toBuzzEntryView(entry: BuzzEntry): BuzzEntryView {
     eliminated: entry.eliminated,
     adjustedTime: entry.adjustedTime,
     nearTie: entry.nearTie,
+    mode: entry.mode,
   };
 }
 
@@ -239,7 +357,7 @@ export function toRoundView(round: Round): RoundView {
   return {
     roundId: round.roundId,
     status: round.status,
-    buzzMode: round.buzzMode,
+    modeParams: round.modeParams,
     activePlayerId: activeEntry?.playerId ?? null,
     buzzOrder: round.buzzOrder.map(toBuzzEntryView),
   };

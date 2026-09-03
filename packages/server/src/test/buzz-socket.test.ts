@@ -102,7 +102,7 @@ describe("open_buzz", () => {
     const [h, p] = await Promise.all([hostGetsRound, playerGetsRound]);
 
     expect(h.round.status).toBe("open");
-    expect(h.round.buzzMode).toBe("button");
+    expect(h.round.modeParams.mode).toBe("button");
     expect(h.round.buzzOrder).toHaveLength(0);
     expect(p.round.roundId).toBe(h.round.roundId); // same round on both sides
   });

@@ -1,5 +1,6 @@
 import type { BuzzPayload } from "@buzzroom/shared";
 import {
+  checkBuzzCredentials,
   processBuzz,
   getActiveEntry,
   toBuzzEntryView,
@@ -32,6 +33,28 @@ export function onBuzz(
     return;
   }
 
+  // Verify the buzz presents this round's gesture credentials before it is
+  // allowed anywhere near the ranking. Without this a player could skip the
+  // slide or pattern entirely and emit a bare "buzz" event, which would make
+  // the gesture modes decorative.
+  const credentials = checkBuzzCredentials(room.round, payload);
+  if (!credentials.ok) {
+    socket.emit("server_error", {
+      code: "VALIDATION_ERROR",
+      message:
+        credentials.reason === "wrong_mode"
+          ? "That buzz is for a different input mode than this round."
+          : credentials.reason === "bad_token"
+            ? "That buzz is not for the current round."
+            : "The pattern you traced does not match this round's pattern.",
+    });
+    console.log(
+      `[buzz] rejected "${player.name}" in ${room.roomCode} ` +
+        `(${credentials.reason})`,
+    );
+    return;
+  }
+
   const serverTime = Date.now();
 
   // Pass payload.adjustedTime to processBuzz.
@@ -44,6 +67,7 @@ export function onBuzz(
     serverTime,
     payload.adjustedTime,
     room.settings.earlyBuzzPenalty,
+    payload.mode,
   );
 
   switch (result.type) {

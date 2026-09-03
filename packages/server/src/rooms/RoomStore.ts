@@ -121,13 +121,21 @@ export class RoomStore {
   // ---------- Remove player ----------
 
   /**
-   * Removes the player associated with a given socketId.
+   * Marks the player on a given socketId as disconnected.
+   *
+   * The player record is deliberately *kept*. Spec §12 requires that a
+   * player who drops out mid-round can come back on the same playerId with
+   * their score and their already-submitted buzz intact, so the record has
+   * to outlive the socket. Deleting it here would also wipe the scoreboard
+   * of anyone whose phone briefly lost signal.
+   *
    * Returns the affected room and player so callers can emit the right
-   * events, or undefined if this socket wasn't in any room.
+   * events, plus whether that player was the host, or undefined if this
+   * socket wasn't in any room.
    */
-  removePlayerBySocketId(
+  markDisconnectedBySocketId(
     socketId: string,
-  ): { room: Room; player: Player } | undefined {
+  ): { room: Room; player: Player; wasHost: boolean } | undefined {
     const roomId = this.socketIndex.get(socketId);
     if (!roomId) return undefined;
 
@@ -139,16 +147,52 @@ export class RoomStore {
     );
     if (!player) return undefined;
 
-    room.players.delete(player.playerId);
+    const wasHost = player.playerId === room.hostPlayerId;
+
+    player.isConnected = false;
+    player.socketId = "";
     this.socketIndex.delete(socketId);
     room.lastActivityAt = Date.now();
 
-    // If the room is now empty, clean it up immediately rather than
-    // waiting for the periodic cleanup job.
-    if (room.players.size === 0) {
-      this.rooms.delete(roomId);
-      this.codeIndex.delete(room.roomCode);
-    }
+    // Rooms are no longer torn down the moment they empty -- everyone might
+    // be mid-reconnect. An empty room is left to the periodic cleanup job,
+    // which expires it after ROOM_MAX_AGE_MS of no activity.
+
+    return { room, player, wasHost };
+  }
+
+  /**
+   * Rebinds an existing player record to a new socket.
+   *
+   * Returns undefined when the room code is unknown or no such player is in
+   * it, so a stale session in a browser tab can't resurrect a room that has
+   * already been cleaned up.
+   */
+  reconnectPlayer(
+    roomCode: string,
+    playerId: string,
+    socketId: string,
+  ): { room: Room; player: Player } | undefined {
+    const room = this.getByCode(roomCode);
+    if (!room) return undefined;
+
+    const player = room.players.get(playerId);
+    if (!player) return undefined;
+
+    // Drop the index entry for the socket this player used to hold, if any,
+    // so a stale socketId can never resolve back to this room.
+    if (player.socketId) this.socketIndex.delete(player.socketId);
+
+    player.socketId = socketId;
+    player.isConnected = true;
+    this.socketIndex.set(socketId, room.roomId);
+
+    // getHostRoom() authorises host actions by comparing socket.id against
+    // room.hostSocketId, so without this a reconnected host would be locked
+    // out of every control on their own game.
+    if (player.playerId === room.hostPlayerId) room.hostSocketId = socketId;
+
+    room.lastActivityAt = Date.now();
 
     return { room, player };
   }
@@ -251,7 +295,7 @@ export class RoomStore {
     for (const [roomId, room] of this.rooms) {
       if (room.lastActivityAt < cutoff) {
         for (const player of room.players.values()) {
-          this.socketIndex.delete(player.socketId);
+          if (player.socketId) this.socketIndex.delete(player.socketId);
         }
         this.codeIndex.delete(room.roomCode);
         this.rooms.delete(roomId);

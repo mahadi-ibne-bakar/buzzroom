@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { describe, expect, it, beforeEach } from "vitest";
 import { RoomStore } from "../rooms/RoomStore.js";
 
@@ -62,27 +63,121 @@ describe("RoomStore.addPlayer", () => {
   });
 });
 
-describe("RoomStore.removePlayerBySocketId", () => {
-  it("removes the player and returns room + player", () => {
+describe("RoomStore.markDisconnectedBySocketId", () => {
+  it("keeps the player record and returns room + player", () => {
     const { room } = store.createRoom("s1", "Alice");
     store.addPlayer(room.roomId, "s2", "Bob");
 
-    const result = store.removePlayerBySocketId("s2");
+    const result = store.markDisconnectedBySocketId("s2");
     expect(result).toBeDefined();
     expect(result!.player.name).toBe("Bob");
-    expect(room.players.size).toBe(1);
+    expect(result!.player.isConnected).toBe(false);
+    // The seat is kept so the player can reconnect onto it (spec §12).
+    expect(room.players.size).toBe(2);
   });
 
-  it("deletes the room when the last player leaves", () => {
+  it("preserves the disconnected player's score", () => {
     const { room } = store.createRoom("s1", "Alice");
-    store.removePlayerBySocketId("s1");
+    const bob = store.addPlayer(room.roomId, "s2", "Bob")!;
+    store.awardPoints(room.roomId, bob.playerId, 7);
 
-    expect(store.roomCount).toBe(0);
-    expect(store.getByCode(room.roomCode)).toBeUndefined();
+    store.markDisconnectedBySocketId("s2");
+
+    expect(room.players.get(bob.playerId)!.score).toBe(7);
+  });
+
+  it("reports whether the disconnected player was the host", () => {
+    const { room } = store.createRoom("s1", "Alice");
+    store.addPlayer(room.roomId, "s2", "Bob");
+
+    expect(store.markDisconnectedBySocketId("s2")!.wasHost).toBe(false);
+    expect(store.markDisconnectedBySocketId("s1")!.wasHost).toBe(true);
+  });
+
+  it("keeps the room alive when the last player disconnects", () => {
+    // Everyone might be mid-reconnect, so an empty room is left for the
+    // periodic cleanup job rather than torn down immediately.
+    const { room } = store.createRoom("s1", "Alice");
+    store.markDisconnectedBySocketId("s1");
+
+    expect(store.roomCount).toBe(1);
+    expect(store.getByCode(room.roomCode)).toBeDefined();
+  });
+
+  it("stops resolving the old socketId to the room", () => {
+    store.createRoom("s1", "Alice");
+    store.markDisconnectedBySocketId("s1");
+
+    expect(store.getRoomBySocketId("s1")).toBeUndefined();
   });
 
   it("returns undefined for an unknown socketId", () => {
-    expect(store.removePlayerBySocketId("no-such-socket")).toBeUndefined();
+    expect(store.markDisconnectedBySocketId("no-such-socket")).toBeUndefined();
+  });
+});
+
+describe("RoomStore.reconnectPlayer", () => {
+  it("rebinds the player to a new socket with their score intact", () => {
+    const { room } = store.createRoom("s1", "Alice");
+    const bob = store.addPlayer(room.roomId, "s2", "Bob")!;
+    store.awardPoints(room.roomId, bob.playerId, 3);
+    store.markDisconnectedBySocketId("s2");
+
+    const result = store.reconnectPlayer(room.roomCode, bob.playerId, "s2-new");
+
+    expect(result).toBeDefined();
+    expect(result!.player.isConnected).toBe(true);
+    expect(result!.player.score).toBe(3);
+    expect(store.getRoomBySocketId("s2-new")!.roomId).toBe(room.roomId);
+  });
+
+  it("moves hostSocketId when the returning player is the host", () => {
+    // getHostRoom() authorises on socket.id === room.hostSocketId, so a
+    // reconnected host would otherwise lose every control on their own game.
+    const { room, player } = store.createRoom("s1", "Alice");
+    store.markDisconnectedBySocketId("s1");
+
+    store.reconnectPlayer(room.roomCode, player.playerId, "s1-new");
+
+    expect(room.hostSocketId).toBe("s1-new");
+  });
+
+  it("accepts a lowercase room code", () => {
+    const { room, player } = store.createRoom("s1", "Alice");
+    store.markDisconnectedBySocketId("s1");
+
+    const result = store.reconnectPlayer(
+      room.roomCode.toLowerCase(),
+      player.playerId,
+      "s1-new",
+    );
+
+    expect(result).toBeDefined();
+  });
+
+  it("returns undefined for an unknown room code", () => {
+    const { player } = store.createRoom("s1", "Alice");
+    expect(
+      store.reconnectPlayer("ZZZZZZ", player.playerId, "s9"),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined for a playerId that was never in the room", () => {
+    const { room } = store.createRoom("s1", "Alice");
+    expect(
+      store.reconnectPlayer(room.roomCode, randomUUID(), "s9"),
+    ).toBeUndefined();
+  });
+
+  it("releases the player's previous socket from the index", () => {
+    // Reconnecting without a disconnect first (e.g. a second tab) must not
+    // leave the old socketId resolving to the room.
+    const { room, player } = store.createRoom("s1", "Alice");
+
+    store.reconnectPlayer(room.roomCode, player.playerId, "s1-new");
+
+    expect(store.getRoomBySocketId("s1")).toBeUndefined();
+    expect(store.getRoomBySocketId("s1-new")).toBeDefined();
   });
 });
 

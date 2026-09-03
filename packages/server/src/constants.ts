@@ -15,3 +15,13 @@ export const NEAR_TIE_THRESHOLD_MS = 50;
 // server's current clock. Clamps timestamp manipulation: a player who
 // backdates their buzz by more than this still gets clamped to the floor.
 export const MAX_CLOCK_SKEW_MS = 2_000;
+
+// ── Buzz-in modes (Phase 8) ───────────────────────────────────────────────
+
+// The pattern buzzer draws a 3x3 grid, so dot indices run 0-8. Sequences are
+// PATTERN_MIN_LENGTH..PATTERN_MAX_LENGTH dots long -- long enough to be a
+// real gesture, short enough that nobody is fumbling while the round runs.
+// These bounds must stay inside the range BuzzPayloadSchema accepts (3-9).
+export const PATTERN_DOT_COUNT = 9;
+export const PATTERN_MIN_LENGTH = 4;
+export const PATTERN_MAX_LENGTH = 6;

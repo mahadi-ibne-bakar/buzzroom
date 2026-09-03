@@ -6,10 +6,10 @@ export function onDisconnect(
   socket: TypedSocket,
   store: RoomStore,
 ): void {
-  const result = store.removePlayerBySocketId(socket.id);
+  const result = store.markDisconnectedBySocketId(socket.id);
   if (!result) return; // this socket wasn't in a room
 
-  const { room, player } = result;
+  const { room, player, wasHost } = result;
 
   // We use io.to() rather than socket.to() here because by the time
   // "disconnect" fires, the socket has already left all Socket.io
@@ -19,7 +19,16 @@ export function onDisconnect(
     playerName: player.name,
   });
 
+  // Spec §12: a host disconnect pauses the game rather than ending it --
+  // there is no host migration in v1. Players get told so their screens can
+  // say why nothing is happening, and the host can reconnect into the same
+  // room on the same playerId.
+  if (wasHost) {
+    io.to(room.roomId).emit("host_left");
+  }
+
   console.log(
-    `[room] "${player.name}" left ${room.roomCode} (socket ${socket.id})`,
+    `[room] "${player.name}" disconnected from ${room.roomCode} ` +
+      `(socket ${socket.id})${wasHost ? " -- was host" : ""}`,
   );
 }

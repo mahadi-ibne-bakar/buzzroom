@@ -5,6 +5,7 @@ import {
   CreateRoomPayloadSchema,
   JoinRoomPayloadSchema,
   OpenBuzzPayloadSchema,
+  ReconnectRoomPayloadSchema,
   SyncPingPayloadSchema,
 } from "@buzzroom/shared";
 import type { RoomStore } from "../rooms/RoomStore.js";
@@ -17,6 +18,7 @@ import { onCreateRoom } from "./handlers/onCreateRoom.js";
 import { onDisconnect } from "./handlers/onDisconnect.js";
 import { onJoinRoom } from "./handlers/onJoinRoom.js";
 import { onOpenBuzz } from "./handlers/onOpenBuzz.js";
+import { onReconnect } from "./handlers/onReconnect.js";
 import { onResetRound } from "./handlers/onResetRound.js";
 import { onSyncPing } from "./handlers/onSyncPing.js";
 import { SocketRateLimiter } from "./rateLimiter.js";
@@ -76,6 +78,15 @@ export function registerSocketHandlers(
       const data = validate(JoinRoomPayloadSchema, payload);
       if (!data) return;
       onJoinRoom(io, socket, store, data);
+    });
+
+    // Reconnects are more frequent than joins -- a flaky phone can drop and
+    // come back several times a round -- so the budget is more generous.
+    socket.on("reconnect_room", (payload) => {
+      if (!rateCheck("reconnect_room", 20)) return;
+      const data = validate(ReconnectRoomPayloadSchema, payload);
+      if (!data) return;
+      onReconnect(io, socket, store, data);
     });
 
     // ── Phase 4: buzz round lifecycle ─────────────────────────────────────

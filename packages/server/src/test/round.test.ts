@@ -12,7 +12,7 @@ describe("createRound", () => {
   it("starts with status open and an empty buzz order", () => {
     const round = createRound("button");
     expect(round.status).toBe("open");
-    expect(round.buzzMode).toBe("button");
+    expect(round.modeParams.mode).toBe("button");
     expect(round.buzzOrder).toHaveLength(0);
   });
 });
@@ -23,7 +23,7 @@ describe("processBuzz — open round", () => {
   it("accepts a buzz and assigns rank 1 to the first player", () => {
     const round = createRound("button");
     const t = Date.now();
-    const result = processBuzz(round, "p1", "Alice", t, t, true);
+    const result = processBuzz(round, "p1", "Alice", t, t, true, "button");
 
     expect(result.type).toBe("accepted");
     if (result.type !== "accepted") return;
@@ -35,8 +35,8 @@ describe("processBuzz — open round", () => {
   it("assigns ascending ranks to successive buzzes", () => {
     const round = createRound("button");
     const t = Date.now();
-    processBuzz(round, "p1", "Alice", t, t, true);
-    const r2 = processBuzz(round, "p2", "Bob", t + 10, t + 10, true);
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
+    const r2 = processBuzz(round, "p2", "Bob", t + 10, t + 10, true, "button");
 
     expect(r2.type).toBe("accepted");
     if (r2.type !== "accepted") return;
@@ -46,8 +46,16 @@ describe("processBuzz — open round", () => {
   it("returns already_buzzed if the same player buzzes twice", () => {
     const round = createRound("button");
     const t = Date.now();
-    processBuzz(round, "p1", "Alice", t, t, true);
-    const result = processBuzz(round, "p1", "Alice", t + 1, t + 1, true);
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
+    const result = processBuzz(
+      round,
+      "p1",
+      "Alice",
+      t + 1,
+      t + 1,
+      true,
+      "button",
+    );
 
     expect(result.type).toBe("already_buzzed");
     expect(round.buzzOrder).toHaveLength(1);
@@ -65,9 +73,9 @@ describe("processBuzz — adjustedTime ordering", () => {
     const open = round.openedAtServerTime;
 
     // Bob: arrives first (serverTime = open+10), pressed at open+200
-    processBuzz(round, "p2", "Bob", open + 10, open + 200, true);
+    processBuzz(round, "p2", "Bob", open + 10, open + 200, true, "button");
     // Alice: arrives second (serverTime = open+50), pressed at open+100
-    processBuzz(round, "p1", "Alice", open + 50, open + 100, true);
+    processBuzz(round, "p1", "Alice", open + 50, open + 100, true, "button");
 
     expect(round.buzzOrder[0]!.playerName).toBe("Alice"); // lower adjustedTime
     expect(round.buzzOrder[0]!.rank).toBe(1);
@@ -81,7 +89,7 @@ describe("processBuzz — adjustedTime ordering", () => {
 
     // Attempt to cheat by backdating 10 seconds before round opened
     const cheatTime = round.openedAtServerTime - 10_000;
-    processBuzz(round, "p1", "Cheat", serverNow, cheatTime, true);
+    processBuzz(round, "p1", "Cheat", serverNow, cheatTime, true, "button");
 
     // Should be clamped to (openedAtServerTime - 100ms buffer)
     const floor = round.openedAtServerTime - 100;
@@ -93,7 +101,7 @@ describe("processBuzz — adjustedTime ordering", () => {
     const serverNow = round.openedAtServerTime + 100;
     // MAX_CLOCK_SKEW_MS = 2000; claim 5 seconds in the future
     const futureTime = serverNow + 5_000;
-    processBuzz(round, "p1", "Alice", serverNow, futureTime, true);
+    processBuzz(round, "p1", "Alice", serverNow, futureTime, true, "button");
 
     // Clamped to serverNow + 2000
     expect(round.buzzOrder[0]!.adjustedTime).toBeLessThanOrEqual(
@@ -109,8 +117,8 @@ describe("processBuzz — near-tie detection", () => {
     const round = createRound("button");
     const open = round.openedAtServerTime;
 
-    processBuzz(round, "p1", "Alice", open + 10, open + 100, true);
-    processBuzz(round, "p2", "Bob", open + 20, open + 130, true); // 30ms apart
+    processBuzz(round, "p1", "Alice", open + 10, open + 100, true, "button");
+    processBuzz(round, "p2", "Bob", open + 20, open + 130, true, "button"); // 30ms apart
 
     expect(round.buzzOrder[0]!.nearTie).toBe(true);
     expect(round.buzzOrder[1]!.nearTie).toBe(true);
@@ -120,8 +128,8 @@ describe("processBuzz — near-tie detection", () => {
     const round = createRound("button");
     const open = round.openedAtServerTime;
 
-    processBuzz(round, "p1", "Alice", open + 10, open + 100, true);
-    processBuzz(round, "p2", "Bob", open + 20, open + 200, true); // 100ms apart
+    processBuzz(round, "p1", "Alice", open + 10, open + 100, true, "button");
+    processBuzz(round, "p2", "Bob", open + 20, open + 200, true, "button"); // 100ms apart
 
     expect(round.buzzOrder[0]!.nearTie).toBe(false);
     expect(round.buzzOrder[1]!.nearTie).toBe(false);
@@ -133,9 +141,9 @@ describe("processBuzz — near-tie detection", () => {
     const round = createRound("button");
     const open = round.openedAtServerTime;
 
-    processBuzz(round, "p1", "Alice", open + 5, open + 100, true);
-    processBuzz(round, "p2", "Bob", open + 10, open + 140, true);
-    processBuzz(round, "p3", "Carol", open + 15, open + 300, true);
+    processBuzz(round, "p1", "Alice", open + 5, open + 100, true, "button");
+    processBuzz(round, "p2", "Bob", open + 10, open + 140, true, "button");
+    processBuzz(round, "p3", "Carol", open + 15, open + 300, true, "button");
 
     expect(round.buzzOrder[0]!.playerName).toBe("Alice");
     expect(round.buzzOrder[0]!.nearTie).toBe(true); // near-tie with Bob
@@ -154,7 +162,7 @@ describe("processBuzz — closed round", () => {
     round.status = "closed";
     const t = Date.now();
 
-    const result = processBuzz(round, "p1", "Alice", t, t, true);
+    const result = processBuzz(round, "p1", "Alice", t, t, true, "button");
 
     expect(result.type).toBe("penalty_applied");
     if (result.type !== "penalty_applied") return;
@@ -167,8 +175,8 @@ describe("processBuzz — closed round", () => {
     round.status = "closed";
     const t = Date.now();
 
-    processBuzz(round, "p1", "Alice", t, t, true);
-    const r2 = processBuzz(round, "p1", "Alice", t + 1, t + 1, true);
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
+    const r2 = processBuzz(round, "p1", "Alice", t + 1, t + 1, true, "button");
 
     expect(r2.type).toBe("penalty_applied");
     if (r2.type !== "penalty_applied") return;
@@ -181,9 +189,9 @@ describe("processBuzz — closed round", () => {
     round.status = "closed";
     const t = Date.now();
 
-    processBuzz(round, "p1", "Alice", t, t, true);
-    processBuzz(round, "p1", "Alice", t + 1, t + 1, true);
-    const r3 = processBuzz(round, "p1", "Alice", t + 2, t + 2, true);
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
+    processBuzz(round, "p1", "Alice", t + 1, t + 1, true, "button");
+    const r3 = processBuzz(round, "p1", "Alice", t + 2, t + 2, true, "button");
 
     expect(r3.type).toBe("penalty_applied");
     if (r3.type !== "penalty_applied") return;
@@ -195,7 +203,7 @@ describe("processBuzz — closed round", () => {
     round.status = "closed";
     const t = Date.now();
 
-    const result = processBuzz(round, "p1", "Alice", t, t, false);
+    const result = processBuzz(round, "p1", "Alice", t, t, false, "button");
     expect(result.type).toBe("round_closed");
   });
 });
@@ -208,10 +216,18 @@ describe("processBuzz — active lockout", () => {
     round.status = "closed";
 
     const t = 1_000;
-    processBuzz(round, "p1", "Alice", t, t, true); // 500ms lock
+    processBuzz(round, "p1", "Alice", t, t, true, "button"); // 500ms lock
 
     round.status = "open";
-    const result = processBuzz(round, "p1", "Alice", t + 100, t + 100, true);
+    const result = processBuzz(
+      round,
+      "p1",
+      "Alice",
+      t + 100,
+      t + 100,
+      true,
+      "button",
+    );
 
     expect(result.type).toBe("locked_out");
     if (result.type !== "locked_out") return;
@@ -223,10 +239,18 @@ describe("processBuzz — active lockout", () => {
     round.status = "closed";
 
     const t = 1_000;
-    processBuzz(round, "p1", "Alice", t, t, true); // 500ms lock
+    processBuzz(round, "p1", "Alice", t, t, true, "button"); // 500ms lock
 
     round.status = "open";
-    const result = processBuzz(round, "p1", "Alice", t + 600, t + 600, true);
+    const result = processBuzz(
+      round,
+      "p1",
+      "Alice",
+      t + 600,
+      t + 600,
+      true,
+      "button",
+    );
 
     expect(result.type).toBe("accepted");
   });
@@ -243,8 +267,8 @@ describe("getActiveEntry", () => {
   it("returns the first non-eliminated entry", () => {
     const round = createRound("button");
     const t = Date.now();
-    processBuzz(round, "p1", "Alice", t, t, true);
-    processBuzz(round, "p2", "Bob", t + 1, t + 100, true);
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
+    processBuzz(round, "p2", "Bob", t + 1, t + 100, true, "button");
 
     round.buzzOrder[0]!.eliminated = true;
 
@@ -255,7 +279,7 @@ describe("getActiveEntry", () => {
   it("returns null when all entries are eliminated", () => {
     const round = createRound("button");
     const t = Date.now();
-    processBuzz(round, "p1", "Alice", t, t, true);
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
     round.buzzOrder[0]!.eliminated = true;
 
     expect(getActiveEntry(round)).toBeNull();
@@ -273,7 +297,7 @@ describe("advanceQueue", () => {
   it("correct — closes the round and returns the winner", () => {
     const round = createRound("button");
     const t = Date.now();
-    processBuzz(round, "p1", "Alice", t, t, true);
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
 
     const result = advanceQueue(round, "correct");
 
@@ -286,8 +310,8 @@ describe("advanceQueue", () => {
   it("wrong — eliminates active player and promotes the next one", () => {
     const round = createRound("button");
     const t = Date.now();
-    processBuzz(round, "p1", "Alice", t, t, true);
-    processBuzz(round, "p2", "Bob", t + 1, t + 100, true);
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
+    processBuzz(round, "p2", "Bob", t + 1, t + 100, true, "button");
 
     const result = advanceQueue(round, "wrong");
 
@@ -301,7 +325,7 @@ describe("advanceQueue", () => {
   it("wrong — returns null for nextActiveEntry when no one is left", () => {
     const round = createRound("button");
     const t = Date.now();
-    processBuzz(round, "p1", "Alice", t, t, true);
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
 
     const result = advanceQueue(round, "wrong");
 
