@@ -334,3 +334,38 @@ describe("advanceQueue", () => {
     expect(result.nextActiveEntry).toBeNull();
   });
 });
+
+// ── double-resolve guard ──────────────────────────────────────────────────
+
+describe("advanceQueue resolution guard", () => {
+  it("refuses a second correct on an already-resolved round", () => {
+    const round = createRound("button");
+    const t = Date.now();
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
+
+    expect(advanceQueue(round, "correct").type).toBe("correct");
+    // A host double-tapping the tick must not award the points twice.
+    expect(advanceQueue(round, "correct").type).toBe("already_resolved");
+  });
+
+  it("refuses a wrong after the round has been resolved", () => {
+    const round = createRound("button");
+    const t = Date.now();
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
+    processBuzz(round, "p2", "Bob", t + 10, t + 10, true, "button");
+
+    advanceQueue(round, "correct");
+
+    expect(advanceQueue(round, "wrong").type).toBe("already_resolved");
+  });
+
+  it("still allows working through the queue before a correct", () => {
+    const round = createRound("button");
+    const t = Date.now();
+    processBuzz(round, "p1", "Alice", t, t, true, "button");
+    processBuzz(round, "p2", "Bob", t + 10, t + 10, true, "button");
+
+    expect(advanceQueue(round, "wrong").type).toBe("wrong");
+    expect(advanceQueue(round, "correct").type).toBe("correct");
+  });
+});

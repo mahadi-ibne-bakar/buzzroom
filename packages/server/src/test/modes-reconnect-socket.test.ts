@@ -363,3 +363,33 @@ describe("host_left", () => {
     expect(host.connected).toBe(true);
   });
 });
+
+describe("advance_queue", () => {
+  it("awards the configured points, once, even if the host taps twice", async () => {
+    const { host, roomCode } = await openRoom();
+    const { player, playerId } = await joinPlayer(roomCode, "Alice");
+    await openRound(host, player, "button");
+
+    const buzzed = waitForEvent<BuzzOrderUpdatedPayload>(
+      host,
+      "buzz_order_updated",
+    );
+    const t = Date.now();
+    player.emit("buzz", { mode: "button", localTime: t, adjustedTime: t });
+    await buzzed;
+
+    const scored = waitForEvent<ScoreUpdatePayload>(host, "score_update");
+    host.emit("advance_queue", { result: "correct", points: 3 });
+    await scored;
+
+    // Second tap: rejected rather than silently doubling the score.
+    const err = waitForEvent<ServerErrorPayload>(host, "server_error");
+    host.emit("advance_queue", { result: "correct", points: 3 });
+    expect((await err).code).toBe("INVALID_STATE");
+
+    const settled = waitForEvent<ScoreUpdatePayload>(host, "score_update");
+    host.emit("award_points", { playerId, delta: 1 });
+    const { players } = await settled;
+    expect(players.find((p) => p.playerId === playerId)!.score).toBe(4);
+  });
+});

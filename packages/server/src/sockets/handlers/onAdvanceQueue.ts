@@ -29,6 +29,14 @@ export function onAdvanceQueue(
   const result = advanceQueue(room.round, payload.result);
 
   switch (result.type) {
+    case "already_resolved": {
+      socket.emit("server_error", {
+        code: "INVALID_STATE",
+        message: "This round has already been resolved.",
+      });
+      break;
+    }
+
     case "no_active_player": {
       socket.emit("server_error", {
         code: "INVALID_STATE",

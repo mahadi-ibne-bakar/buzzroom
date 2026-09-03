@@ -7,7 +7,7 @@ import { ButtonBuzzer } from "../components/buzz/ButtonBuzzer.js";
 import { SlideBuzzer } from "../components/buzz/SlideBuzzer.js";
 import { PatternBuzzer } from "../components/buzz/PatternBuzzer.js";
 import { useEffect, useState } from "react";
-import type { BuzzPayload } from "@buzzroom/shared";
+import { buildBuzzPayload } from "../lib/buildBuzzPayload.js";
 
 /**
  * Counts an early-buzz lockout down to zero, re-rendering roughly ten times a
@@ -53,30 +53,10 @@ export function PlayerScreen() {
   // Build and emit the buzz payload for the current mode
   const handleBuzz = (localTime: number) => {
     if (!round) return;
-    const adjustedTime = localTime + offsetRef.current;
-    const mode = round.modeParams.mode;
-
-    let payload: BuzzPayload;
-    if (mode === "button") {
-      payload = { mode: "button", localTime, adjustedTime };
-    } else if (mode === "slide") {
-      payload = {
-        mode: "slide",
-        token: round.modeParams.token,
-        localTime,
-        adjustedTime,
-      };
-    } else {
-      payload = {
-        mode: "pattern",
-        token: round.modeParams.token,
-        sequence: round.modeParams.sequence,
-        localTime,
-        adjustedTime,
-      };
-    }
-
-    socket.emit("buzz", payload);
+    socket.emit(
+      "buzz",
+      buildBuzzPayload(round.modeParams, localTime, offsetRef.current),
+    );
   };
 
   return (

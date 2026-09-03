@@ -37,6 +37,10 @@ export interface Round {
   // every open (see createRound) so a gesture can never be pre-practised.
   modeParams: ModeParams;
   status: "open" | "closed";
+  // Set once the host has marked someone correct. Distinct from status:
+  // "closed" only means no new buzzes are accepted, which is also true after
+  // close_buzz while the host is still working through the queue.
+  resolved: boolean;
   openedAtServerTime: number;
   buzzOrder: BuzzEntry[];
   lockouts: Map<string, EarlyBuzzLockout>;
@@ -99,6 +103,7 @@ export function createRound(mode: BuzzMode): Round {
     roundId: randomUUID(),
     modeParams: generateModeParams(mode),
     status: "open",
+    resolved: false,
     openedAtServerTime: Date.now(),
     buzzOrder: [],
     lockouts: new Map(),
@@ -319,17 +324,24 @@ export type AdvanceResult =
       nextActiveEntry: BuzzEntry | null;
     }
   | { type: "correct"; winnerEntry: BuzzEntry }
+  | { type: "already_resolved" }
   | { type: "no_active_player" };
 
 export function advanceQueue(
   round: Round,
   result: "correct" | "wrong",
 ): AdvanceResult {
+  // Without this, a host who taps the tick twice -- or whose first tap looked
+  // unresponsive on a slow connection -- awards the points twice, silently
+  // doubling someone's score.
+  if (round.resolved) return { type: "already_resolved" };
+
   const activeEntry = getActiveEntry(round);
   if (!activeEntry) return { type: "no_active_player" };
 
   if (result === "correct") {
     round.status = "closed";
+    round.resolved = true;
     return { type: "correct", winnerEntry: activeEntry };
   }
 
