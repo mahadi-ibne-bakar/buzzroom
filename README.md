@@ -12,8 +12,8 @@ dependency tree.
 packages/
   shared/   TypeScript types shared between server and client
             (the WebSocket protocol -- added in a later phase)
-  server/   Node.js + TypeScript backend (Socket.io -- added in a later phase)
-  client/   React + TypeScript frontend (Vite)
+  server/   Node.js + TypeScript backend (Express + Socket.io)
+  client/   React + TypeScript frontend (Vite -- added in a later phase)
 ```
 
 **Why a monorepo for a project this size?** One git history, one CI pipeline,
@@ -24,14 +24,15 @@ apart.
 
 ## Status
 
-Phase 1: project scaffolding only. No application logic yet -- this commit
-just proves the tooling (TypeScript, ESLint, Prettier, Vitest, CI) all work
-together correctly.
+Phase 2: minimal backend skeleton. The server boots, serves a `/health`
+check, and accepts Socket.io connections (no rooms or buzz logic yet --
+that's Phase 3). Both are covered by real tests now, not placeholders.
 
 ## Setup
 
 ```bash
 npm install
+cp packages/server/.env.example packages/server/.env
 ```
 
 ## Scripts (run from the repo root)
@@ -43,5 +44,14 @@ npm install
 | `npm run format:check` | Check formatting without changing files (used in CI) |
 | `npm test`             | Run tests in every package that has them             |
 
-Per-package dev commands (run inside `packages/client`, etc.) will be added
-as each package gains real functionality.
+## Running the server
+
+```bash
+cd packages/server
+npm run dev
+```
+
+Then in another terminal: `curl http://localhost:3001/health`
+
+Per-package dev commands for the client will be added once it has anything
+to talk to.
