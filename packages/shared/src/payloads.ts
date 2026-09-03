@@ -1,12 +1,5 @@
 import { z } from "zod";
 
-// Why Zod here, not just TypeScript types?
-// TypeScript types are erased at runtime. A malicious (or buggy) client
-// can send any JSON it wants over the socket. Zod validates the actual
-// runtime values, and the TypeScript types are automatically derived from
-// the same schema — so there's only one place to update if a payload
-// shape changes.
-
 // ── Phase 3: room lifecycle ───────────────────────────────────────────────
 
 export const CreateRoomPayloadSchema = z.object({
@@ -32,25 +25,38 @@ export type OpenBuzzPayload = z.infer<typeof OpenBuzzPayloadSchema>;
 
 export const AdvanceQueuePayloadSchema = z.object({
   result: z.enum(["correct", "wrong"]),
+  // How many points to award on a correct answer.
+  // Optional with a default of 1 — omitting it is the same as Phase 4 behaviour.
+  // Allows 0 (resolve the question correctly but award no points).
+  points: z.number().int().min(0).max(100).default(1),
 });
 export type AdvanceQueuePayload = z.infer<typeof AdvanceQueuePayloadSchema>;
 
 // ── Phase 5: fairness engine ──────────────────────────────────────────────
 
-// Ping sent by the client on a ~2s heartbeat to keep its clock-offset
-// estimate fresh. The server echoes t0 back in sync_pong so the client
-// can compute RTT = (receiveTime - t0).
 export const SyncPingPayloadSchema = z.object({
-  t0: z.number().int().positive(), // client local time in ms (Date.now())
+  t0: z.number().int().positive(),
 });
 export type SyncPingPayload = z.infer<typeof SyncPingPayloadSchema>;
 
-// Buzz payload now carries both the raw local timestamp and the
-// client's latency-adjusted estimate. The server ranks by adjustedTime;
-// it keeps localTime for debugging and audit trails.
 export const BuzzPayloadSchema = z.object({
   mode: z.enum(["button"]),
-  localTime: z.number().int().positive(), // raw client clock at press
-  adjustedTime: z.number().int().positive(), // localTime + clientClockOffset
+  localTime: z.number().int().positive(),
+  adjustedTime: z.number().int().positive(),
 });
 export type BuzzPayload = z.infer<typeof BuzzPayloadSchema>;
+
+// ── Phase 6: scoring ──────────────────────────────────────────────────────
+
+export const AwardPointsPayloadSchema = z.object({
+  playerId: z.string().uuid(),
+  // Positive to award, negative to deduct. Zero is rejected — a delta of 0
+  // is always a no-op and most likely a client bug.
+  delta: z
+    .number()
+    .int()
+    .min(-100)
+    .max(100)
+    .refine((d) => d !== 0, { message: "delta must be non-zero" }),
+});
+export type AwardPointsPayload = z.infer<typeof AwardPointsPayloadSchema>;

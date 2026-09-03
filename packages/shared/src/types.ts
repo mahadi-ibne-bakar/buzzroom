@@ -1,8 +1,3 @@
-// These are the "view" types — the client-facing representations of
-// domain objects. They deliberately omit internal server fields like
-// socketId (which the client has no business knowing) so that the
-// server never leaks implementation details over the wire.
-
 export interface PlayerView {
   playerId: string;
   name: string;
@@ -15,17 +10,28 @@ export interface BuzzEntryView {
   playerId: string;
   playerName: string;
   eliminated: boolean;
-  // Phase 5 additions — exposed to the host for transparency:
-  adjustedTime: number; // estimated server-clock time of the buzz
-  nearTie: boolean; // true if within NEAR_TIE_THRESHOLD_MS of an adjacent entry
+  adjustedTime: number;
+  nearTie: boolean;
 }
 
 export interface RoundView {
   roundId: string;
   status: "open" | "closed";
-  buzzMode: "button"; // will expand to "slide" | "pattern" in Phase 8
+  buzzMode: "button";
   activePlayerId: string | null;
   buzzOrder: BuzzEntryView[];
+}
+
+// Represents one row in the ranked leaderboard.
+// Uses standard competition ranking (1-1-3, not 1-1-2):
+// tied players share a rank; the next rank skips accordingly.
+export interface LeaderboardEntry {
+  rank: number;
+  playerId: string;
+  name: string;
+  score: number;
+  isConnected: boolean;
+  isTied: boolean; // shares their score with at least one other player
 }
 
 export interface RoomView {

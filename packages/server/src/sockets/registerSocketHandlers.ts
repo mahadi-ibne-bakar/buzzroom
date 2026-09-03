@@ -1,5 +1,6 @@
 import {
   AdvanceQueuePayloadSchema,
+  AwardPointsPayloadSchema,
   BuzzPayloadSchema,
   CreateRoomPayloadSchema,
   JoinRoomPayloadSchema,
@@ -9,6 +10,7 @@ import {
 import type { RoomStore } from "../rooms/RoomStore.js";
 import type { TypedServer } from "../socketTypes.js";
 import { onAdvanceQueue } from "./handlers/onAdvanceQueue.js";
+import { onAwardPoints } from "./handlers/onAwardPoints.js";
 import { onBuzz } from "./handlers/onBuzz.js";
 import { onCloseBuzz } from "./handlers/onCloseBuzz.js";
 import { onCreateRoom } from "./handlers/onCreateRoom.js";
@@ -19,7 +21,10 @@ import { onResetRound } from "./handlers/onResetRound.js";
 import { onSyncPing } from "./handlers/onSyncPing.js";
 import { SocketRateLimiter } from "./rateLimiter.js";
 
-export function registerSocketHandlers(io: TypedServer, store: RoomStore): void {
+export function registerSocketHandlers(
+  io: TypedServer,
+  store: RoomStore,
+): void {
   io.on("connection", (socket) => {
     console.log(`socket connected: ${socket.id}`);
 
@@ -40,7 +45,9 @@ export function registerSocketHandlers(io: TypedServer, store: RoomStore): void 
 
     function validate<T>(
       schema: {
-        safeParse: (v: unknown) => { success: true; data: T } | { success: false };
+        safeParse: (
+          v: unknown,
+        ) => { success: true; data: T } | { success: false };
       },
       payload: unknown,
     ): T | null {
@@ -105,14 +112,21 @@ export function registerSocketHandlers(io: TypedServer, store: RoomStore): void 
     });
 
     // ── Phase 5: clock sync ───────────────────────────────────────────────
-    // Clients ping on a ~2s heartbeat; allow up to 60/min (2× expected rate)
-    // to give headroom for reconnect bursts and catch-up syncing on join.
 
     socket.on("sync_ping", (payload) => {
       if (!rateCheck("sync_ping", 60)) return;
       const data = validate(SyncPingPayloadSchema, payload);
       if (!data) return;
       onSyncPing(socket, store, data);
+    });
+
+    // ── Phase 6: scoring ──────────────────────────────────────────────────
+
+    socket.on("award_points", (payload) => {
+      if (!rateCheck("award_points", 60)) return;
+      const data = validate(AwardPointsPayloadSchema, payload);
+      if (!data) return;
+      onAwardPoints(io, socket, store, data);
     });
 
     // ── Disconnect ────────────────────────────────────────────────────────
