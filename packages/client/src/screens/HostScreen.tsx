@@ -17,6 +17,10 @@ export function HostScreen() {
   const [selectedMode, setSelectedMode] = useState<BuzzMode>("button");
   const [awardTarget, setAwardTarget] = useState("");
   const [awardDelta, setAwardDelta] = useState("1");
+  // Points a correct answer is worth this round. The protocol has always
+  // carried this (AdvanceQueuePayload.points) but the UI never sent it, so
+  // every question was hard-wired to 1 point.
+  const [roundPoints, setRoundPoints] = useState("1");
   const [tab, setTab] = useState<"round" | "scores">("round");
 
   const { room, myPlayerId, leaderboard, roundResult } = state;
@@ -28,8 +32,13 @@ export function HostScreen() {
   const openBuzz = () => socket.emit("open_buzz", { buzzMode: selectedMode });
   const closeBuzz = () => socket.emit("close_buzz");
   const resetRound = () => socket.emit("reset_round");
-  const advance = (result: "correct" | "wrong") =>
-    socket.emit("advance_queue", { result });
+  const advance = (result: "correct" | "wrong") => {
+    const parsed = parseInt(roundPoints, 10);
+    const points = Number.isNaN(parsed)
+      ? 1
+      : Math.min(Math.max(parsed, 0), 100);
+    socket.emit("advance_queue", { result, points });
+  };
 
   const awardPoints = () => {
     const delta = parseInt(awardDelta, 10);
@@ -163,12 +172,27 @@ export function HostScreen() {
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={resetRound}
-                  className="text-slate-500 hover:text-slate-300 text-xs"
-                >
-                  Reset round
-                </button>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1 text-slate-500 text-xs">
+                    Worth
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={roundPoints}
+                      onChange={(e) => setRoundPoints(e.target.value)}
+                      className="w-12 bg-slate-800 text-white rounded-lg px-2 py-1 text-xs"
+                      aria-label="Points for a correct answer"
+                    />
+                    pts
+                  </label>
+                  <button
+                    onClick={resetRound}
+                    className="text-slate-500 hover:text-slate-300 text-xs"
+                  >
+                    Reset round
+                  </button>
+                </div>
               </div>
 
               <BuzzOrder

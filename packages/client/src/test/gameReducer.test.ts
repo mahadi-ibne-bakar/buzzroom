@@ -16,6 +16,7 @@ const initial: GameState = {
   errorMessage: null,
   hostGone: false,
   roundResult: null,
+  lockout: null,
 };
 
 function makeRoom(overrides: Partial<RoomView> = {}): RoomView {
@@ -305,5 +306,127 @@ describe("ERROR and LEAVE", () => {
     const next = dispatch(state, { type: "LEAVE" });
     expect(next.screen).toBe("landing");
     expect(next.room).toBeNull();
+  });
+});
+
+// ── hostGone lifecycle ────────────────────────────────────────────────────
+
+describe("hostGone", () => {
+  const joined: GameState = {
+    ...initial,
+    screen: "player",
+    room: makeRoom({
+      players: [
+        { playerId: "host-1", name: "Host", score: 0, isConnected: false },
+        { playerId: "p2", name: "Alice", score: 0, isConnected: true },
+      ],
+    }),
+    myPlayerId: "p2",
+    hostGone: true,
+  };
+
+  it("stays set when a non-host player rejoins", () => {
+    const next = dispatch(joined, {
+      type: "PLAYER_JOINED",
+      player: { playerId: "p3", name: "Bob", score: 0, isConnected: true },
+    });
+    expect(next.hostGone).toBe(true);
+  });
+
+  it("clears when the host themselves rejoins", () => {
+    const next = dispatch(joined, {
+      type: "PLAYER_JOINED",
+      player: { playerId: "host-1", name: "Host", score: 0, isConnected: true },
+    });
+    expect(next.hostGone).toBe(false);
+  });
+});
+
+// ── RECONNECTED ───────────────────────────────────────────────────────────
+
+describe("RECONNECTED", () => {
+  it("keeps the leaderboard already on screen", () => {
+    const withScores: GameState = {
+      ...initial,
+      screen: "player",
+      room: makeRoom(),
+      myPlayerId: "p2",
+      leaderboard: [
+        {
+          rank: 1,
+          playerId: "p2",
+          name: "Alice",
+          score: 4,
+          isConnected: true,
+          isTied: false,
+        },
+      ],
+    };
+
+    const next = dispatch(withScores, {
+      type: "RECONNECTED",
+      room: makeRoom(),
+      myPlayerId: "p2",
+    });
+
+    expect(next.leaderboard).toHaveLength(1);
+    expect(next.leaderboard[0]?.score).toBe(4);
+  });
+
+  it("clears a stale error and the host-gone banner", () => {
+    const stale: GameState = {
+      ...initial,
+      screen: "player",
+      room: makeRoom(),
+      myPlayerId: "p2",
+      errorMessage: "Connection lost",
+      hostGone: true,
+    };
+
+    const next = dispatch(stale, {
+      type: "RECONNECTED",
+      room: makeRoom(),
+      myPlayerId: "p2",
+    });
+
+    expect(next.errorMessage).toBeNull();
+    expect(next.hostGone).toBe(false);
+  });
+});
+
+// ── EARLY_BUZZ_PENALTY ────────────────────────────────────────────────────
+
+describe("EARLY_BUZZ_PENALTY", () => {
+  it("records a deadline in the future and the offense count", () => {
+    const before = Date.now();
+    const next = dispatch(initial, {
+      type: "EARLY_BUZZ_PENALTY",
+      lockedForMs: 500,
+      offenseCount: 2,
+    });
+
+    expect(next.lockout?.offenseCount).toBe(2);
+    expect(next.lockout!.until).toBeGreaterThanOrEqual(before + 500);
+  });
+
+  it("is cleared when the next round opens", () => {
+    const locked = dispatch(
+      { ...initial, room: makeRoom() },
+      { type: "EARLY_BUZZ_PENALTY", lockedForMs: 500, offenseCount: 1 },
+    );
+    expect(locked.lockout).not.toBeNull();
+
+    const next = dispatch(locked, {
+      type: "ROUND_OPENED",
+      round: {
+        roundId: "r1",
+        status: "open",
+        modeParams: { mode: "button" },
+        activePlayerId: null,
+        buzzOrder: [],
+      },
+    });
+
+    expect(next.lockout).toBeNull();
   });
 });

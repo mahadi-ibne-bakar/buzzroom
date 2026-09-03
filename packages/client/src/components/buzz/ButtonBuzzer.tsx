@@ -6,9 +6,18 @@ interface Props {
   onBuzz: (localTime: number) => void;
   disabled: boolean;
   myRank: number | null;
+  /** Seconds left on an early-buzz penalty, or null when not locked out. */
+  lockoutSecondsLeft: number | null;
 }
 
-export function ButtonBuzzer({ onBuzz, disabled, myRank }: Props) {
+export function ButtonBuzzer({
+  onBuzz,
+  disabled,
+  myRank,
+  lockoutSecondsLeft,
+}: Props) {
+  const lockedOut = lockoutSecondsLeft !== null;
+
   const handlePointerDown = (e: React.PointerEvent) => {
     if (disabled) return;
     e.preventDefault();
@@ -26,14 +35,28 @@ export function ButtonBuzzer({ onBuzz, disabled, myRank }: Props) {
           ${
             myRank !== null
               ? "bg-green-600 text-white scale-95 cursor-default"
-              : disabled
-                ? "bg-slate-700 text-slate-500 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-500 active:scale-95 active:bg-indigo-700 text-white cursor-pointer shadow-lg shadow-indigo-900"
+              : lockedOut
+                ? "bg-red-900 text-red-300 cursor-not-allowed animate-pulse"
+                : disabled
+                  ? "bg-slate-700 text-slate-500 cursor-not-allowed"
+                  : "bg-indigo-600 hover:bg-indigo-500 active:scale-95 active:bg-indigo-700 text-white cursor-pointer shadow-lg shadow-indigo-900"
           }
         `}
       >
-        {myRank !== null ? `#${myRank} 🎉` : disabled ? "Locked" : "BUZZ"}
+        {myRank !== null
+          ? `#${myRank} 🎉`
+          : lockedOut
+            ? `${lockoutSecondsLeft.toFixed(1)}s`
+            : disabled
+              ? "Locked"
+              : "BUZZ"}
       </button>
+
+      {lockedOut && (
+        <p className="text-red-400 text-sm text-center">
+          Too early — locked out for a moment
+        </p>
+      )}
     </div>
   );
 }

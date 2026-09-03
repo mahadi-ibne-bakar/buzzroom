@@ -5,12 +5,21 @@ interface Props {
   onBuzz: (localTime: number) => void;
   disabled: boolean;
   myRank: number | null;
+  /** Seconds left on an early-buzz penalty, or null when not locked out. */
+  lockoutSecondsLeft: number | null;
 }
 
-export function PatternBuzzer({ sequence, onBuzz, disabled, myRank }: Props) {
+export function PatternBuzzer({
+  sequence,
+  onBuzz,
+  disabled,
+  myRank,
+  lockoutSecondsLeft,
+}: Props) {
   const [tapped, setTapped] = useState<number[]>([]);
   const [failed, setFailed] = useState(false);
   const completed = myRank !== null;
+  const lockedOut = lockoutSecondsLeft !== null;
 
   const handleTap = (dotIndex: number) => {
     if (disabled || completed || failed) return;
@@ -42,18 +51,20 @@ export function PatternBuzzer({ sequence, onBuzz, disabled, myRank }: Props) {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <p className="text-slate-400 text-sm">
+      <p className={`text-sm ${lockedOut ? "text-red-400" : "text-slate-400"}`}>
         {completed
           ? `Rank #${myRank} 🎉`
-          : failed
-            ? "Wrong dot — try again"
-            : `Tap dots in order (${tapped.length}/${sequence.length})`}
+          : lockedOut
+            ? `Too early — locked out for ${lockoutSecondsLeft.toFixed(1)}s`
+            : failed
+              ? "Wrong dot — try again"
+              : `Tap dots in order (${tapped.length}/${sequence.length})`}
       </p>
 
       {/* 3×3 grid */}
       <div
         className={`grid grid-cols-3 gap-4 p-4 rounded-2xl transition-all ${
-          failed ? "bg-red-900" : "bg-slate-800"
+          failed || lockedOut ? "bg-red-900" : "bg-slate-800"
         }`}
       >
         {Array.from({ length: 9 }, (_, dotIndex) => {

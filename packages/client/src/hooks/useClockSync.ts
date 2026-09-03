@@ -11,7 +11,12 @@ type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 // Number of ping samples to keep. We use the lowest-RTT sample's offset
 // estimate — same heuristic as NTP reference implementations.
 const MAX_SAMPLES = 8;
-const PING_INTERVAL_MS = 2_000;
+
+// Spec §7.1: ~2s while a round is live, so the offset is as fresh as possible
+// at the moment someone buzzes; ~8s while idle, because a sync every 2s for a
+// room sitting between questions is pure battery and bandwidth cost.
+const PING_INTERVAL_ACTIVE_MS = 2_000;
+const PING_INTERVAL_IDLE_MS = 8_000;
 
 /**
  * Maintains a live estimate of (serverClock - clientClock) by running
@@ -21,7 +26,7 @@ const PING_INTERVAL_MS = 2_000;
  * triggering re-renders.
  *
  * Usage:
- *   const offsetRef = useClockSync(socket, connected);
+ *   const offsetRef = useClockSync(socket, connected, roundOpen);
  *   // When buzzing:
  *   const localTime = Date.now();
  *   const adjustedTime = localTime + offsetRef.current;
@@ -29,13 +34,17 @@ const PING_INTERVAL_MS = 2_000;
 export function useClockSync(
   socket: AppSocket | null,
   connected: boolean,
+  roundActive: boolean,
 ): React.MutableRefObject<number> {
   const offsetRef = useRef(0);
+  // Held across effect re-runs so switching cadence when a round opens does
+  // not throw away the samples already collected.
+  const samplesRef = useRef<Array<{ offset: number; rtt: number }>>([]);
 
   useEffect(() => {
     if (!socket || !connected) return;
 
-    const samples: Array<{ offset: number; rtt: number }> = [];
+    const samples = samplesRef.current;
 
     const ping = () => {
       socket.emit("sync_ping", { t0: Date.now() });
@@ -56,13 +65,16 @@ export function useClockSync(
 
     socket.on("sync_pong", handlePong);
     ping(); // immediate first ping to get a baseline offset quickly
-    const interval = setInterval(ping, PING_INTERVAL_MS);
+    const interval = setInterval(
+      ping,
+      roundActive ? PING_INTERVAL_ACTIVE_MS : PING_INTERVAL_IDLE_MS,
+    );
 
     return () => {
       socket.off("sync_pong", handlePong);
       clearInterval(interval);
     };
-  }, [socket, connected]);
+  }, [socket, connected, roundActive]);
 
   return offsetRef;
 }

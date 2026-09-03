@@ -7,11 +7,22 @@ import {
 } from "react";
 import type {
   BuzzEntryView,
+  BuzzOrderUpdatedPayload,
+  EarlyBuzzPenaltyPayload,
+  JoinOkPayload,
   LeaderboardEntry,
   ModeParams,
+  PlayerJoinedPayload,
+  PlayerLeftPayload,
   PlayerView,
+  ReconnectOkPayload,
+  RoomCreatedPayload,
   RoomView,
+  RoundOpenedPayload,
+  RoundResolvedPayload,
   RoundView,
+  ScoreUpdatePayload,
+  ServerErrorPayload,
 } from "@buzzroom/shared";
 import { useSocket } from "./SocketContext.js";
 
@@ -29,6 +40,10 @@ export interface GameState {
     winnerName: string;
     pointsAwarded: number;
   } | null;
+  // Set when the server applies an early-buzz penalty. `until` is a local
+  // epoch-ms deadline, so components can render a countdown without asking
+  // the server again.
+  lockout: { until: number; offenseCount: number } | null;
 }
 
 const initial: GameState = {
@@ -39,6 +54,7 @@ const initial: GameState = {
   errorMessage: null,
   hostGone: false,
   roundResult: null,
+  lockout: null,
 };
 
 // ── Actions ───────────────────────────────────────────────────────────────
@@ -69,6 +85,7 @@ export type GameAction =
       winnerName: string;
       pointsAwarded: number;
     }
+  | { type: "EARLY_BUZZ_PENALTY"; lockedForMs: number; offenseCount: number }
   | { type: "ERROR"; message: string }
   | { type: "CLEAR_ERROR" }
   | { type: "LEAVE" };
@@ -88,12 +105,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "JOINED":
     case "RECONNECTED": {
       const isHost = action.myPlayerId === action.room.hostPlayerId;
+      // Keep the leaderboard and any round result already on screen. A
+      // RECONNECTED that reset them would discard exactly the state the
+      // reconnect was meant to restore.
       return {
-        ...initial,
+        ...state,
         screen: isHost ? "host" : "player",
         room: action.room,
         myPlayerId: action.myPlayerId,
-        leaderboard: [],
+        errorMessage: null,
+        hostGone: false,
       };
     }
 
@@ -107,13 +128,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             p.playerId === action.player.playerId ? action.player : p,
           )
         : [...state.room.players, action.player];
+      // Only the host coming back clears the host-gone banner. The previous
+      // expression cleared it whenever *any* player rejoined.
+      const hostIsBack = action.player.playerId === state.room.hostPlayerId;
       return {
         ...state,
         room: { ...state.room, players },
-        hostGone:
-          state.hostGone && action.player.playerId !== state.room.hostPlayerId
-            ? true
-            : false,
+        hostGone: hostIsBack ? false : state.hostGone,
       };
     }
 
@@ -138,6 +159,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         room: { ...state.room, round: action.round },
         roundResult: null,
+        lockout: null,
       };
 
     case "ROUND_CLOSED":
@@ -195,6 +217,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         },
       };
 
+    case "EARLY_BUZZ_PENALTY":
+      return {
+        ...state,
+        lockout: {
+          until: Date.now() + action.lockedForMs,
+          offenseCount: action.offenseCount,
+        },
+      };
+
     case "ERROR":
       return { ...state, errorMessage: action.message };
 
@@ -225,80 +256,108 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   // Wire all server→client events to dispatch
   useEffect(() => {
-    socket.on("room_created", ({ room, yourPlayerId }) => {
+    const saveSession = (playerId: string, roomCode: string) => {
       sessionStorage.setItem(
         "buzzroom-session",
-        JSON.stringify({ playerId: yourPlayerId, roomCode: room.roomCode }),
+        JSON.stringify({ playerId, roomCode }),
       );
-      dispatch({ type: "ROOM_CREATED", room, myPlayerId: yourPlayerId });
-    });
-    socket.on("join_ok", ({ room, yourPlayerId }) => {
-      sessionStorage.setItem(
-        "buzzroom-session",
-        JSON.stringify({ playerId: yourPlayerId, roomCode: room.roomCode }),
-      );
-      dispatch({ type: "JOINED", room, myPlayerId: yourPlayerId });
-    });
-    socket.on("reconnect_ok", ({ room, yourPlayerId }) => {
-      sessionStorage.setItem(
-        "buzzroom-session",
-        JSON.stringify({ playerId: yourPlayerId, roomCode: room.roomCode }),
-      );
-      dispatch({ type: "RECONNECTED", room, myPlayerId: yourPlayerId });
-    });
-    socket.on("player_joined", ({ player }) =>
-      dispatch({ type: "PLAYER_JOINED", player }),
-    );
-    socket.on("player_left", ({ playerId }) =>
-      dispatch({ type: "PLAYER_LEFT", playerId }),
-    );
-    socket.on("host_left", () => dispatch({ type: "HOST_LEFT" }));
-    socket.on("round_opened", ({ round }) =>
-      dispatch({ type: "ROUND_OPENED", round }),
-    );
-    socket.on("round_closed", () => dispatch({ type: "ROUND_CLOSED" }));
-    socket.on("round_reset", () => dispatch({ type: "ROUND_RESET" }));
-    socket.on("buzz_order_updated", ({ buzzOrder, activePlayerId }) =>
-      dispatch({ type: "BUZZ_ORDER_UPDATED", buzzOrder, activePlayerId }),
-    );
-    socket.on("score_update", ({ players, leaderboard }) =>
-      dispatch({ type: "SCORE_UPDATED", players, leaderboard }),
-    );
-    socket.on(
-      "round_resolved",
-      ({ winnerPlayerId, winnerName, pointsAwarded }) =>
+    };
+
+    // Named handlers so the cleanup can remove exactly these. The previous
+    // version called socket.removeAllListeners(), which also tore off the
+    // connect/disconnect listeners SocketProvider owns -- under StrictMode's
+    // mount/unmount/remount that left `connected` stuck and the
+    // "Reconnecting…" banner up for the rest of the session.
+    const handlers = {
+      room_created: ({ room, yourPlayerId }: RoomCreatedPayload) => {
+        saveSession(yourPlayerId, room.roomCode);
+        dispatch({ type: "ROOM_CREATED", room, myPlayerId: yourPlayerId });
+      },
+      join_ok: ({ room, yourPlayerId }: JoinOkPayload) => {
+        saveSession(yourPlayerId, room.roomCode);
+        dispatch({ type: "JOINED", room, myPlayerId: yourPlayerId });
+      },
+      reconnect_ok: ({ room, yourPlayerId }: ReconnectOkPayload) => {
+        saveSession(yourPlayerId, room.roomCode);
+        dispatch({ type: "RECONNECTED", room, myPlayerId: yourPlayerId });
+      },
+      player_joined: ({ player }: PlayerJoinedPayload) =>
+        dispatch({ type: "PLAYER_JOINED", player }),
+      player_left: ({ playerId }: PlayerLeftPayload) =>
+        dispatch({ type: "PLAYER_LEFT", playerId }),
+      host_left: () => dispatch({ type: "HOST_LEFT" }),
+      round_opened: ({ round }: RoundOpenedPayload) =>
+        dispatch({ type: "ROUND_OPENED", round }),
+      round_closed: () => dispatch({ type: "ROUND_CLOSED" }),
+      round_reset: () => dispatch({ type: "ROUND_RESET" }),
+      buzz_order_updated: ({
+        buzzOrder,
+        activePlayerId,
+      }: BuzzOrderUpdatedPayload) =>
+        dispatch({ type: "BUZZ_ORDER_UPDATED", buzzOrder, activePlayerId }),
+      score_update: ({ players, leaderboard }: ScoreUpdatePayload) =>
+        dispatch({ type: "SCORE_UPDATED", players, leaderboard }),
+      round_resolved: ({
+        winnerPlayerId,
+        winnerName,
+        pointsAwarded,
+      }: RoundResolvedPayload) =>
         dispatch({
           type: "ROUND_RESOLVED",
           winnerPlayerId,
           winnerName,
           pointsAwarded,
         }),
-    );
-    socket.on("server_error", ({ message }) =>
-      dispatch({ type: "ERROR", message }),
-    );
+      early_buzz_penalty: ({
+        lockedForMs,
+        offenseCount,
+      }: EarlyBuzzPenaltyPayload) => {
+        // Spec §5 asks for a haptic nudge alongside the cooldown. Not every
+        // browser implements it, hence the guard.
+        navigator.vibrate?.(200);
+        dispatch({ type: "EARLY_BUZZ_PENALTY", lockedForMs, offenseCount });
+      },
+      server_error: ({ message }: ServerErrorPayload) =>
+        dispatch({ type: "ERROR", message }),
+    } as const;
 
+    for (const [event, handler] of Object.entries(handlers)) {
+      socket.on(event as keyof typeof handlers, handler as never);
+    }
     return () => {
-      socket.removeAllListeners();
+      for (const [event, handler] of Object.entries(handlers)) {
+        socket.off(event as keyof typeof handlers, handler as never);
+      }
     };
   }, [socket]);
 
-  // On mount, attempt reconnect from session storage
+  // On mount, attempt to rejoin whatever room this tab was last in.
   useEffect(() => {
     const raw = sessionStorage.getItem("buzzroom-session");
     if (!raw) return;
+
+    let session: { playerId: string; roomCode: string };
     try {
-      const { playerId, roomCode } = JSON.parse(raw) as {
-        playerId: string;
-        roomCode: string;
-      };
-      socket.connect();
-      socket.once("connect", () => {
-        socket.emit("reconnect_room", { playerId, roomCode });
-      });
+      session = JSON.parse(raw) as { playerId: string; roomCode: string };
     } catch {
       sessionStorage.removeItem("buzzroom-session");
+      return;
     }
+
+    const rejoin = () => {
+      socket.emit("reconnect_room", session);
+    };
+
+    // Re-emit on every reconnect, not just the first connect: socket.io
+    // restores the transport on its own after a network blip, and the server
+    // has no memory of which room the new socket belongs to.
+    socket.on("connect", rejoin);
+    if (socket.connected) rejoin();
+    else socket.connect();
+
+    return () => {
+      socket.off("connect", rejoin);
+    };
   }, [socket]);
 
   return (

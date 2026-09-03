@@ -6,24 +6,47 @@ import { Leaderboard } from "../components/Leaderboard.js";
 import { ButtonBuzzer } from "../components/buzz/ButtonBuzzer.js";
 import { SlideBuzzer } from "../components/buzz/SlideBuzzer.js";
 import { PatternBuzzer } from "../components/buzz/PatternBuzzer.js";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { BuzzPayload } from "@buzzroom/shared";
+
+/**
+ * Counts an early-buzz lockout down to zero, re-rendering roughly ten times a
+ * second while it runs and returning null once it has expired. State alone
+ * would freeze at the value it had when the penalty arrived.
+ */
+function useLockoutCountdown(until: number | null): number | null {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (until === null || until <= Date.now()) return;
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
+  }, [until]);
+
+  if (until === null) return null;
+  const remainingMs = until - now;
+  return remainingMs > 0 ? remainingMs / 1000 : null;
+}
 
 export function PlayerScreen() {
   const { state, dispatch } = useGame();
   const { socket, connected } = useSocket();
-  const offsetRef = useClockSync(socket, connected);
   const [tab, setTab] = useState<"buzz" | "scores">("buzz");
 
-  const { room, myPlayerId, leaderboard, roundResult } = state;
+  const { room, myPlayerId, leaderboard, roundResult, lockout } = state;
+  const roundOpen = room?.round?.status === "open";
+
+  // Sync harder while a round is live; see spec §7.1.
+  const offsetRef = useClockSync(socket, connected, roundOpen);
+  const lockoutSecondsLeft = useLockoutCountdown(lockout?.until ?? null);
+
   if (!room) return null;
 
   const round = room.round;
   const myEntry = round?.buzzOrder.find((e) => e.playerId === myPlayerId);
   const myRank = myEntry && !myEntry.eliminated ? myEntry.rank : null;
   const buzzedIn = myEntry !== undefined;
-  const roundOpen = round?.status === "open";
-  const buzzerDisabled = !roundOpen || buzzedIn;
+  const buzzerDisabled = !roundOpen || buzzedIn || lockoutSecondsLeft !== null;
 
   const myPlayer = room.players.find((p) => p.playerId === myPlayerId);
 
@@ -144,6 +167,7 @@ export function PlayerScreen() {
                   onBuzz={handleBuzz}
                   disabled={buzzerDisabled}
                   myRank={myRank}
+                  lockoutSecondsLeft={lockoutSecondsLeft}
                 />
               )}
               {round.modeParams.mode === "slide" && (
@@ -151,6 +175,7 @@ export function PlayerScreen() {
                   onBuzz={handleBuzz}
                   disabled={buzzerDisabled}
                   myRank={myRank}
+                  lockoutSecondsLeft={lockoutSecondsLeft}
                 />
               )}
               {round.modeParams.mode === "pattern" && (
@@ -159,6 +184,7 @@ export function PlayerScreen() {
                   onBuzz={handleBuzz}
                   disabled={buzzerDisabled}
                   myRank={myRank}
+                  lockoutSecondsLeft={lockoutSecondsLeft}
                 />
               )}
 
