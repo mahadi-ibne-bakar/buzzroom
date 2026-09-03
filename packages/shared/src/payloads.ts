@@ -7,6 +7,8 @@ import { z } from "zod";
 // the same schema — so there's only one place to update if a payload shape
 // changes.
 
+// ---------- Phase 3: room lifecycle ----------
+
 export const CreateRoomPayloadSchema = z.object({
   hostName: z.string().min(1).max(20),
 });
@@ -23,3 +25,23 @@ export const JoinRoomPayloadSchema = z.object({
   playerName: z.string().min(1).max(20),
 });
 export type JoinRoomPayload = z.infer<typeof JoinRoomPayloadSchema>;
+
+// ---------- Phase 4: buzz round lifecycle ----------
+
+export const OpenBuzzPayloadSchema = z.object({
+  // Only "button" exists now; "slide" and "pattern" come in Phase 8.
+  // Defining this as an enum now means adding new modes is a non-breaking
+  // change — clients that only know about "button" just ignore new values.
+  buzzMode: z.enum(["button"]),
+});
+export type OpenBuzzPayload = z.infer<typeof OpenBuzzPayloadSchema>;
+
+export const BuzzPayloadSchema = z.object({
+  mode: z.enum(["button"]),
+});
+export type BuzzPayload = z.infer<typeof BuzzPayloadSchema>;
+
+export const AdvanceQueuePayloadSchema = z.object({
+  result: z.enum(["correct", "wrong"]),
+});
+export type AdvanceQueuePayload = z.infer<typeof AdvanceQueuePayloadSchema>;

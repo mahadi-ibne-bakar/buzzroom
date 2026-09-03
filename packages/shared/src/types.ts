@@ -10,9 +10,25 @@ export interface PlayerView {
   isConnected: boolean;
 }
 
+export interface BuzzEntryView {
+  rank: number;
+  playerId: string;
+  playerName: string;
+  eliminated: boolean; // true after the host marks this player wrong
+}
+
+export interface RoundView {
+  roundId: string;
+  status: "open" | "closed";
+  buzzMode: "button"; // will expand to "slide" | "pattern" in Phase 8
+  activePlayerId: string | null; // first non-eliminated player; null if none
+  buzzOrder: BuzzEntryView[];
+}
+
 export interface RoomView {
   roomId: string;
   roomCode: string;
   hostPlayerId: string;
   players: PlayerView[];
+  round: RoundView | null; // null = no buzz round currently active
 }

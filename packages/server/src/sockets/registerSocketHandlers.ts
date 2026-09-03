@@ -1,12 +1,20 @@
 import {
   CreateRoomPayloadSchema,
   JoinRoomPayloadSchema,
+  OpenBuzzPayloadSchema,
+  BuzzPayloadSchema,
+  AdvanceQueuePayloadSchema,
 } from "@buzzroom/shared";
 import type { RoomStore } from "../rooms/RoomStore.js";
 import type { TypedServer } from "../socketTypes.js";
 import { onCreateRoom } from "./handlers/onCreateRoom.js";
 import { onDisconnect } from "./handlers/onDisconnect.js";
 import { onJoinRoom } from "./handlers/onJoinRoom.js";
+import { onOpenBuzz } from "./handlers/onOpenBuzz.js";
+import { onCloseBuzz } from "./handlers/onCloseBuzz.js";
+import { onResetRound } from "./handlers/onResetRound.js";
+import { onBuzz } from "./handlers/onBuzz.js";
+import { onAdvanceQueue } from "./handlers/onAdvanceQueue.js";
 import { SocketRateLimiter } from "./rateLimiter.js";
 
 export function registerSocketHandlers(
@@ -16,62 +24,102 @@ export function registerSocketHandlers(
   io.on("connection", (socket) => {
     console.log(`socket connected: ${socket.id}`);
 
-    // Each connection gets its own limiter instance — no shared state
-    // between different clients.
+    // One limiter instance per connection — no shared state between clients.
     const limiter = new SocketRateLimiter();
 
-    // ---------- create_room ----------
-    // Allow 3 room-creation attempts per minute per connection. Hosts
-    // generally create a room once; this just stops a script from
-    // hammering the endpoint.
+    // ----------------------------------------------------------------
+    // Helpers: keeps the per-event boilerplate short
+    // ----------------------------------------------------------------
+
+    function rateCheck(event: string, max: number, windowMs = 60_000): boolean {
+      if (!limiter.check(event, max, windowMs)) {
+        socket.emit("server_error", {
+          code: "RATE_LIMITED",
+          message: "Too many requests. Please wait before trying again.",
+        });
+        return false;
+      }
+      return true;
+    }
+
+    function validate<T>(
+      schema: {
+        safeParse: (
+          v: unknown,
+        ) => { success: true; data: T } | { success: false };
+      },
+      payload: unknown,
+    ): T | null {
+      const result = schema.safeParse(payload);
+      if (!result.success) {
+        socket.emit("server_error", {
+          code: "VALIDATION_ERROR",
+          message: "Invalid payload.",
+        });
+        return null;
+      }
+      return result.data;
+    }
+
+    // ----------------------------------------------------------------
+    // Phase 3 — room lifecycle
+    // ----------------------------------------------------------------
+
     socket.on("create_room", (payload) => {
-      if (!limiter.check("create_room", 3, 60_000)) {
-        socket.emit("server_error", {
-          code: "RATE_LIMITED",
-          message: "Too many requests. Please wait before trying again.",
-        });
-        return;
-      }
-
-      // Validate the runtime value even though TypeScript already types it.
-      // A malicious client can send any JSON — the TS types are erased.
-      const result = CreateRoomPayloadSchema.safeParse(payload);
-      if (!result.success) {
-        socket.emit("server_error", {
-          code: "VALIDATION_ERROR",
-          message: "Invalid payload for create_room.",
-        });
-        return;
-      }
-
-      onCreateRoom(io, socket, store, result.data);
+      if (!rateCheck("create_room", 3)) return;
+      const data = validate(CreateRoomPayloadSchema, payload);
+      if (!data) return;
+      onCreateRoom(io, socket, store, data);
     });
 
-    // ---------- join_room ----------
-    // 10 attempts per minute — a player might mis-type the code a few
-    // times, but more than 10 in a minute is suspicious.
     socket.on("join_room", (payload) => {
-      if (!limiter.check("join_room", 10, 60_000)) {
-        socket.emit("server_error", {
-          code: "RATE_LIMITED",
-          message: "Too many requests. Please wait before trying again.",
-        });
-        return;
-      }
-
-      const result = JoinRoomPayloadSchema.safeParse(payload);
-      if (!result.success) {
-        socket.emit("server_error", {
-          code: "VALIDATION_ERROR",
-          message: "Invalid payload for join_room.",
-        });
-        return;
-      }
-
-      onJoinRoom(io, socket, store, result.data);
+      if (!rateCheck("join_room", 10)) return;
+      const data = validate(JoinRoomPayloadSchema, payload);
+      if (!data) return;
+      onJoinRoom(io, socket, store, data);
     });
 
-    // ---------- disconnect ----------
+    // ----------------------------------------------------------------
+    // Phase 4 — buzz round lifecycle
+    // ----------------------------------------------------------------
+
+    socket.on("open_buzz", (payload) => {
+      if (!rateCheck("open_buzz", 60)) return;
+      const data = validate(OpenBuzzPayloadSchema, payload);
+      if (!data) return;
+      onOpenBuzz(io, socket, store, data);
+    });
+
+    // close_buzz and reset_round carry no payload — nothing to validate.
+    socket.on("close_buzz", () => {
+      if (!rateCheck("close_buzz", 60)) return;
+      onCloseBuzz(io, socket, store);
+    });
+
+    socket.on("reset_round", () => {
+      if (!rateCheck("reset_round", 60)) return;
+      onResetRound(io, socket, store);
+    });
+
+    // Players can buzz many times across a game; generous limit per minute.
+    socket.on("buzz", (payload) => {
+      if (!rateCheck("buzz", 30)) return;
+      const data = validate(BuzzPayloadSchema, payload);
+      if (!data) return;
+      onBuzz(io, socket, store, data);
+    });
+
+    socket.on("advance_queue", (payload) => {
+      if (!rateCheck("advance_queue", 60)) return;
+      const data = validate(AdvanceQueuePayloadSchema, payload);
+      if (!data) return;
+      onAdvanceQueue(io, socket, store, data);
+    });
+
+    // ----------------------------------------------------------------
+    // Disconnect
+    // ----------------------------------------------------------------
+
     socket.on("disconnect", (reason) => {
       console.log(`socket disconnected: ${socket.id} (${reason})`);
       onDisconnect(io, socket, store);

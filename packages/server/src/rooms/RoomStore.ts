@@ -1,10 +1,14 @@
 import { randomUUID } from "node:crypto";
 import type { PlayerView, RoomView } from "@buzzroom/shared";
 import { generateRoomCode } from "./generateRoomCode.js";
+import type { Round } from "./round.js";
+import { toRoundView } from "./round.js";
 
 // ---------- Internal server-side models ----------
-// These are NOT the client-facing View types. They hold extra fields
-// (socketId, internal indices) that clients never see.
+
+export interface RoomSettings {
+  earlyBuzzPenalty: boolean; // default on; penalises buzzing during closed rounds
+}
 
 export interface Player {
   playerId: string;
@@ -24,6 +28,8 @@ export interface Room {
   hostPlayerId: string;
   hostSocketId: string;
   players: Map<string, Player>; // playerId → Player
+  settings: RoomSettings;
+  round: Round | null; // null = no active buzz round
   createdAt: number;
   lastActivityAt: number;
 }
@@ -71,6 +77,8 @@ export class RoomStore {
       hostPlayerId: playerId,
       hostSocketId,
       players: new Map([[playerId, player]]),
+      settings: { earlyBuzzPenalty: true },
+      round: null,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
     };
@@ -145,6 +153,29 @@ export class RoomStore {
     return { room, player };
   }
 
+  // ---------- Points ----------
+
+  /**
+   * Adjusts a player's score by delta (positive = award, negative = deduct).
+   * Returns the updated player, or undefined if the room/player doesn't exist.
+   */
+  awardPoints(
+    roomId: string,
+    playerId: string,
+    delta: number,
+  ): Player | undefined {
+    const room = this.rooms.get(roomId);
+    if (!room) return undefined;
+
+    const player = room.players.get(playerId);
+    if (!player) return undefined;
+
+    player.score += delta;
+    room.lastActivityAt = Date.now();
+
+    return player;
+  }
+
   // ---------- Lookups ----------
 
   getByRoomId(roomId: string): Room | undefined {
@@ -161,8 +192,25 @@ export class RoomStore {
     return roomId ? this.rooms.get(roomId) : undefined;
   }
 
+  /**
+   * Finds the player record for a given socket within their room.
+   * O(n) in players per room (max 20) — acceptable.
+   */
+  getPlayerBySocketId(
+    socketId: string,
+  ): { room: Room; player: Player } | undefined {
+    const room = this.getRoomBySocketId(socketId);
+    if (!room) return undefined;
+
+    const player = Array.from(room.players.values()).find(
+      (p) => p.socketId === socketId,
+    );
+    if (!player) return undefined;
+
+    return { room, player };
+  }
+
   // ---------- View helpers ----------
-  // Convert internal models to the client-facing View types.
 
   toPlayerView(player: Player): PlayerView {
     return {
@@ -181,6 +229,7 @@ export class RoomStore {
       players: Array.from(room.players.values()).map((p) =>
         this.toPlayerView(p),
       ),
+      round: room.round ? toRoundView(room.round) : null,
     };
   }
 
@@ -201,7 +250,6 @@ export class RoomStore {
 
     for (const [roomId, room] of this.rooms) {
       if (room.lastActivityAt < cutoff) {
-        // Clean up all three indices for every player in the room
         for (const player of room.players.values()) {
           this.socketIndex.delete(player.socketId);
         }
@@ -214,11 +262,6 @@ export class RoomStore {
     return count;
   }
 
-  /**
-   * Starts a periodic cleanup job. Call this from the server entry point
-   * (not from createServer, so tests never have long-running timers).
-   * Returns a stop function.
-   */
   startCleanupInterval(intervalMs: number, maxAgeMs: number): () => void {
     const timer = setInterval(() => {
       const removed = this.cleanupStaleRooms(maxAgeMs);
@@ -227,13 +270,11 @@ export class RoomStore {
       }
     }, intervalMs);
 
-    // Allow Node.js to exit even if this timer is still active
     timer.unref();
-
     return () => clearInterval(timer);
   }
 
-  // ---------- Diagnostics (tests / dev only) ----------
+  // ---------- Diagnostics ----------
 
   get roomCount(): number {
     return this.rooms.size;
