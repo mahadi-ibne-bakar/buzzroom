@@ -61,7 +61,11 @@ export function SlideBuzzer({ onBuzz, disabled, myRank }: Props) {
       <div
         ref={trackRef}
         className={`relative w-full h-14 rounded-full select-none no-select ${
-          completed ? "bg-green-700" : disabled ? "bg-slate-700" : "bg-slate-700"
+          completed
+            ? "bg-green-700"
+            : disabled
+              ? "bg-slate-700"
+              : "bg-slate-700"
         }`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

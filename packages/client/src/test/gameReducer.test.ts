@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { gameReducer, type GameState, type GameAction } from "../contexts/GameContext.js";
+import {
+  gameReducer,
+  type GameState,
+  type GameAction,
+} from "../contexts/GameContext.js";
 import type { RoomView } from "@buzzroom/shared";
 
 // ── helpers ───────────────────────────────────────────────────────────────
@@ -19,7 +23,9 @@ function makeRoom(overrides: Partial<RoomView> = {}): RoomView {
     roomId: "room-1",
     roomCode: "ABCDEF",
     hostPlayerId: "host-1",
-    players: [{ playerId: "host-1", name: "Host", score: 0, isConnected: true }],
+    players: [
+      { playerId: "host-1", name: "Host", score: 0, isConnected: true },
+    ],
     round: null,
     ...overrides,
   };
@@ -34,7 +40,11 @@ function dispatch(state: GameState, action: GameAction): GameState {
 describe("ROOM_CREATED", () => {
   it("switches to host screen with the room", () => {
     const room = makeRoom();
-    const next = dispatch(initial, { type: "ROOM_CREATED", room, myPlayerId: "host-1" });
+    const next = dispatch(initial, {
+      type: "ROOM_CREATED",
+      room,
+      myPlayerId: "host-1",
+    });
     expect(next.screen).toBe("host");
     expect(next.room?.roomCode).toBe("ABCDEF");
     expect(next.myPlayerId).toBe("host-1");
@@ -46,7 +56,11 @@ describe("ROOM_CREATED", () => {
 describe("JOINED", () => {
   it("switches to host screen when myPlayerId === hostPlayerId", () => {
     const room = makeRoom();
-    const next = dispatch(initial, { type: "JOINED", room, myPlayerId: "host-1" });
+    const next = dispatch(initial, {
+      type: "JOINED",
+      room,
+      myPlayerId: "host-1",
+    });
     expect(next.screen).toBe("host");
   });
 
@@ -67,7 +81,12 @@ describe("JOINED", () => {
 describe("PLAYER_JOINED", () => {
   it("adds a new player to the room", () => {
     const room = makeRoom();
-    const state: GameState = { ...initial, screen: "host", room, myPlayerId: "host-1" };
+    const state: GameState = {
+      ...initial,
+      screen: "host",
+      room,
+      myPlayerId: "host-1",
+    };
     const next = dispatch(state, {
       type: "PLAYER_JOINED",
       player: { playerId: "p2", name: "Alice", score: 0, isConnected: true },
@@ -83,13 +102,20 @@ describe("PLAYER_JOINED", () => {
         { playerId: "p2", name: "Alice", score: 3, isConnected: false },
       ],
     });
-    const state: GameState = { ...initial, screen: "host", room, myPlayerId: "host-1" };
+    const state: GameState = {
+      ...initial,
+      screen: "host",
+      room,
+      myPlayerId: "host-1",
+    };
     const next = dispatch(state, {
       type: "PLAYER_JOINED",
       player: { playerId: "p2", name: "Alice", score: 3, isConnected: true },
     });
     expect(next.room?.players).toHaveLength(2);
-    expect(next.room?.players.find((p) => p.playerId === "p2")?.isConnected).toBe(true);
+    expect(
+      next.room?.players.find((p) => p.playerId === "p2")?.isConnected,
+    ).toBe(true);
   });
 });
 
@@ -103,9 +129,16 @@ describe("PLAYER_LEFT", () => {
         { playerId: "p2", name: "Alice", score: 0, isConnected: true },
       ],
     });
-    const state: GameState = { ...initial, screen: "host", room, myPlayerId: "host-1" };
+    const state: GameState = {
+      ...initial,
+      screen: "host",
+      room,
+      myPlayerId: "host-1",
+    };
     const next = dispatch(state, { type: "PLAYER_LEFT", playerId: "p2" });
-    expect(next.room?.players.find((p) => p.playerId === "p2")?.isConnected).toBe(false);
+    expect(
+      next.room?.players.find((p) => p.playerId === "p2")?.isConnected,
+    ).toBe(false);
   });
 });
 
@@ -114,7 +147,12 @@ describe("PLAYER_LEFT", () => {
 describe("HOST_LEFT", () => {
   it("sets hostGone flag", () => {
     const room = makeRoom();
-    const state: GameState = { ...initial, screen: "player", room, myPlayerId: "p2" };
+    const state: GameState = {
+      ...initial,
+      screen: "player",
+      room,
+      myPlayerId: "p2",
+    };
     const next = dispatch(state, { type: "HOST_LEFT" });
     expect(next.hostGone).toBe(true);
   });
@@ -147,14 +185,24 @@ describe("round lifecycle", () => {
 
   it("ROUND_CLOSED: sets status to closed", () => {
     const room = makeRoom({ round: roundView });
-    const state: GameState = { ...initial, screen: "host", room, myPlayerId: "host-1" };
+    const state: GameState = {
+      ...initial,
+      screen: "host",
+      room,
+      myPlayerId: "host-1",
+    };
     const next = dispatch(state, { type: "ROUND_CLOSED" });
     expect(next.room?.round?.status).toBe("closed");
   });
 
   it("ROUND_RESET: clears round", () => {
     const room = makeRoom({ round: roundView });
-    const state: GameState = { ...initial, screen: "host", room, myPlayerId: "host-1" };
+    const state: GameState = {
+      ...initial,
+      screen: "host",
+      room,
+      myPlayerId: "host-1",
+    };
     const next = dispatch(state, { type: "ROUND_RESET" });
     expect(next.room?.round).toBeNull();
   });
@@ -172,7 +220,12 @@ describe("BUZZ_ORDER_UPDATED", () => {
       buzzOrder: [],
     };
     const room = makeRoom({ round });
-    const state: GameState = { ...initial, screen: "host", room, myPlayerId: "host-1" };
+    const state: GameState = {
+      ...initial,
+      screen: "host",
+      room,
+      myPlayerId: "host-1",
+    };
     const entry = {
       rank: 1,
       playerId: "p2",
@@ -197,10 +250,17 @@ describe("BUZZ_ORDER_UPDATED", () => {
 describe("SCORE_UPDATED", () => {
   it("updates players and leaderboard", () => {
     const room = makeRoom();
-    const state: GameState = { ...initial, screen: "host", room, myPlayerId: "host-1" };
+    const state: GameState = {
+      ...initial,
+      screen: "host",
+      room,
+      myPlayerId: "host-1",
+    };
     const next = dispatch(state, {
       type: "SCORE_UPDATED",
-      players: [{ playerId: "host-1", name: "Host", score: 5, isConnected: true }],
+      players: [
+        { playerId: "host-1", name: "Host", score: 5, isConnected: true },
+      ],
       leaderboard: [
         {
           rank: 1,
@@ -221,7 +281,10 @@ describe("SCORE_UPDATED", () => {
 
 describe("ERROR and LEAVE", () => {
   it("ERROR sets errorMessage", () => {
-    const next = dispatch(initial, { type: "ERROR", message: "Something went wrong" });
+    const next = dispatch(initial, {
+      type: "ERROR",
+      message: "Something went wrong",
+    });
     expect(next.errorMessage).toBe("Something went wrong");
   });
 
@@ -233,7 +296,12 @@ describe("ERROR and LEAVE", () => {
 
   it("LEAVE resets to initial (minus sessionStorage side-effect)", () => {
     const room = makeRoom();
-    const state: GameState = { ...initial, screen: "host", room, myPlayerId: "host-1" };
+    const state: GameState = {
+      ...initial,
+      screen: "host",
+      room,
+      myPlayerId: "host-1",
+    };
     const next = dispatch(state, { type: "LEAVE" });
     expect(next.screen).toBe("landing");
     expect(next.room).toBeNull();

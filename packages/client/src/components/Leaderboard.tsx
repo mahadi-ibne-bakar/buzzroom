@@ -7,7 +7,9 @@ interface Props {
 
 export function Leaderboard({ entries, myPlayerId }: Props) {
   if (entries.length === 0) {
-    return <p className="text-slate-500 text-sm text-center py-4">No scores yet</p>;
+    return (
+      <p className="text-slate-500 text-sm text-center py-4">No scores yet</p>
+    );
   }
 
   return (

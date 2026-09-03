@@ -37,7 +37,12 @@ export function PlayerScreen() {
     if (mode === "button") {
       payload = { mode: "button", localTime, adjustedTime };
     } else if (mode === "slide") {
-      payload = { mode: "slide", token: round.modeParams.token, localTime, adjustedTime };
+      payload = {
+        mode: "slide",
+        token: round.modeParams.token,
+        localTime,
+        adjustedTime,
+      };
     } else {
       payload = {
         mode: "pattern",
@@ -57,7 +62,9 @@ export function PlayerScreen() {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-slate-400 text-xs">{room.roomCode}</div>
-          <div className="text-white font-semibold">{myPlayer?.name ?? "Player"}</div>
+          <div className="text-white font-semibold">
+            {myPlayer?.name ?? "Player"}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
@@ -77,12 +84,16 @@ export function PlayerScreen() {
       {roundResult && (
         <div
           className={`rounded-2xl p-4 text-center ${
-            roundResult.winnerPlayerId === myPlayerId ? "bg-green-800" : "bg-slate-800"
+            roundResult.winnerPlayerId === myPlayerId
+              ? "bg-green-800"
+              : "bg-slate-800"
           }`}
         >
           {roundResult.winnerPlayerId === myPlayerId ? (
             <>
-              <div className="text-2xl font-bold text-green-300">🎉 Correct!</div>
+              <div className="text-2xl font-bold text-green-300">
+                🎉 Correct!
+              </div>
               <div className="text-green-400 text-sm">
                 +{roundResult.pointsAwarded} pt
                 {roundResult.pointsAwarded !== 1 ? "s" : ""}
@@ -90,7 +101,9 @@ export function PlayerScreen() {
             </>
           ) : (
             <div className="text-slate-300 text-sm">
-              <span className="font-semibold text-white">{roundResult.winnerName}</span>{" "}
+              <span className="font-semibold text-white">
+                {roundResult.winnerName}
+              </span>{" "}
               got it right
             </div>
           )}
@@ -104,7 +117,9 @@ export function PlayerScreen() {
             key={t}
             onClick={() => setTab(t)}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === t ? "bg-slate-600 text-white" : "text-slate-400 hover:text-white"
+              tab === t
+                ? "bg-slate-600 text-white"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             {t === "buzz" ? "Buzzer" : "Scores"}
@@ -166,7 +181,9 @@ export function PlayerScreen() {
         </div>
       )}
 
-      {tab === "scores" && <Leaderboard entries={leaderboard} myPlayerId={myPlayerId} />}
+      {tab === "scores" && (
+        <Leaderboard entries={leaderboard} myPlayerId={myPlayerId} />
+      )}
     </div>
   );
 }

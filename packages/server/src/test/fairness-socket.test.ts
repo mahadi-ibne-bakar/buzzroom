@@ -117,13 +117,25 @@ describe("buzz ordering by adjustedTime", () => {
     // Register for BOTH updates before either buzz is emitted.
     // This eliminates the race where Alice's packet could arrive and fire
     // the second event before we get a chance to attach a .once() listener.
-    const bothBuzzed = collectN<BuzzOrderUpdatedPayload>(host, "buzz_order_updated", 2);
+    const bothBuzzed = collectN<BuzzOrderUpdatedPayload>(
+      host,
+      "buzz_order_updated",
+      2,
+    );
 
     const base = Date.now();
     // Bob's packet arrives first but his adjustedTime is higher (pressed later)
-    bob.emit("buzz", { mode: "button", localTime: base, adjustedTime: base + 200 });
+    bob.emit("buzz", {
+      mode: "button",
+      localTime: base,
+      adjustedTime: base + 200,
+    });
     // Alice's packet arrives second but her adjustedTime is lower (pressed earlier)
-    alice.emit("buzz", { mode: "button", localTime: base, adjustedTime: base + 10 });
+    alice.emit("buzz", {
+      mode: "button",
+      localTime: base,
+      adjustedTime: base + 10,
+    });
 
     const update = await bothBuzzed;
 
@@ -152,7 +164,11 @@ describe("buzz ordering by adjustedTime", () => {
     host.emit("open_buzz", { buzzMode: "button" });
     await waitForEvent(host, "round_opened");
 
-    const bothBuzzed = collectN<BuzzOrderUpdatedPayload>(host, "buzz_order_updated", 2);
+    const bothBuzzed = collectN<BuzzOrderUpdatedPayload>(
+      host,
+      "buzz_order_updated",
+      2,
+    );
 
     alice.emit("buzz", {
       mode: "button",
@@ -198,11 +214,23 @@ describe("near-tie detection", () => {
     host.emit("open_buzz", { buzzMode: "button" });
     await waitForEvent(host, "round_opened");
 
-    const bothBuzzed = collectN<BuzzOrderUpdatedPayload>(host, "buzz_order_updated", 2);
+    const bothBuzzed = collectN<BuzzOrderUpdatedPayload>(
+      host,
+      "buzz_order_updated",
+      2,
+    );
 
     const base = Date.now();
-    alice.emit("buzz", { mode: "button", localTime: base, adjustedTime: base + 100 });
-    bob.emit("buzz", { mode: "button", localTime: base, adjustedTime: base + 120 }); // 20ms apart
+    alice.emit("buzz", {
+      mode: "button",
+      localTime: base,
+      adjustedTime: base + 100,
+    });
+    bob.emit("buzz", {
+      mode: "button",
+      localTime: base,
+      adjustedTime: base + 120,
+    }); // 20ms apart
 
     const update = await bothBuzzed;
 
@@ -230,11 +258,23 @@ describe("near-tie detection", () => {
     host.emit("open_buzz", { buzzMode: "button" });
     await waitForEvent(host, "round_opened");
 
-    const bothBuzzed = collectN<BuzzOrderUpdatedPayload>(host, "buzz_order_updated", 2);
+    const bothBuzzed = collectN<BuzzOrderUpdatedPayload>(
+      host,
+      "buzz_order_updated",
+      2,
+    );
 
     const base = Date.now();
-    alice.emit("buzz", { mode: "button", localTime: base, adjustedTime: base + 100 });
-    bob.emit("buzz", { mode: "button", localTime: base, adjustedTime: base + 250 }); // 150ms apart
+    alice.emit("buzz", {
+      mode: "button",
+      localTime: base,
+      adjustedTime: base + 100,
+    });
+    bob.emit("buzz", {
+      mode: "button",
+      localTime: base,
+      adjustedTime: base + 250,
+    }); // 150ms apart
 
     const update = await bothBuzzed;
 

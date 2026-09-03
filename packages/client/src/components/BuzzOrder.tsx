@@ -16,7 +16,9 @@ export function BuzzOrder({
   onAdvance,
 }: Props) {
   if (buzzOrder.length === 0) {
-    return <p className="text-slate-500 text-sm text-center py-4">No buzzes yet…</p>;
+    return (
+      <p className="text-slate-500 text-sm text-center py-4">No buzzes yet…</p>
+    );
   }
 
   return (
@@ -56,7 +58,9 @@ export function BuzzOrder({
               </span>
             )}
 
-            <span className="text-xs text-slate-500 uppercase">{entry.mode}</span>
+            <span className="text-xs text-slate-500 uppercase">
+              {entry.mode}
+            </span>
 
             {isHost && isActive && onAdvance && (
               <div className="flex gap-2 ml-2">

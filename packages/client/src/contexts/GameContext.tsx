@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useReducer, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useReducer,
+  type ReactNode,
+} from "react";
 import type {
   BuzzEntryView,
   LeaderboardEntry,
@@ -52,7 +58,11 @@ export type GameAction =
       buzzOrder: BuzzEntryView[];
       activePlayerId: string | null;
     }
-  | { type: "SCORE_UPDATED"; players: PlayerView[]; leaderboard: LeaderboardEntry[] }
+  | {
+      type: "SCORE_UPDATED";
+      players: PlayerView[];
+      leaderboard: LeaderboardEntry[];
+    }
   | {
       type: "ROUND_RESOLVED";
       winnerPlayerId: string;
@@ -134,12 +144,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.room?.round) return state;
       return {
         ...state,
-        room: { ...state.room, round: { ...state.room.round, status: "closed" } },
+        room: {
+          ...state.room,
+          round: { ...state.room.round, status: "closed" },
+        },
       };
 
     case "ROUND_RESET":
       if (!state.room) return state;
-      return { ...state, room: { ...state.room, round: null }, roundResult: null };
+      return {
+        ...state,
+        room: { ...state.room, round: null },
+        roundResult: null,
+      };
 
     case "BUZZ_ORDER_UPDATED":
       if (!state.room?.round) return state;
@@ -167,7 +184,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.room?.round) return state;
       return {
         ...state,
-        room: { ...state.room, round: { ...state.room.round, status: "closed" } },
+        room: {
+          ...state.room,
+          round: { ...state.room.round, status: "closed" },
+        },
         roundResult: {
           winnerPlayerId: action.winnerPlayerId,
           winnerName: action.winnerName,
@@ -233,7 +253,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "PLAYER_LEFT", playerId }),
     );
     socket.on("host_left", () => dispatch({ type: "HOST_LEFT" }));
-    socket.on("round_opened", ({ round }) => dispatch({ type: "ROUND_OPENED", round }));
+    socket.on("round_opened", ({ round }) =>
+      dispatch({ type: "ROUND_OPENED", round }),
+    );
     socket.on("round_closed", () => dispatch({ type: "ROUND_CLOSED" }));
     socket.on("round_reset", () => dispatch({ type: "ROUND_RESET" }));
     socket.on("buzz_order_updated", ({ buzzOrder, activePlayerId }) =>
@@ -242,10 +264,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socket.on("score_update", ({ players, leaderboard }) =>
       dispatch({ type: "SCORE_UPDATED", players, leaderboard }),
     );
-    socket.on("round_resolved", ({ winnerPlayerId, winnerName, pointsAwarded }) =>
-      dispatch({ type: "ROUND_RESOLVED", winnerPlayerId, winnerName, pointsAwarded }),
+    socket.on(
+      "round_resolved",
+      ({ winnerPlayerId, winnerName, pointsAwarded }) =>
+        dispatch({
+          type: "ROUND_RESOLVED",
+          winnerPlayerId,
+          winnerName,
+          pointsAwarded,
+        }),
     );
-    socket.on("server_error", ({ message }) => dispatch({ type: "ERROR", message }));
+    socket.on("server_error", ({ message }) =>
+      dispatch({ type: "ERROR", message }),
+    );
 
     return () => {
       socket.removeAllListeners();
@@ -271,7 +302,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [socket]);
 
   return (
-    <GameContext.Provider value={{ state, dispatch }}>{children}</GameContext.Provider>
+    <GameContext.Provider value={{ state, dispatch }}>
+      {children}
+    </GameContext.Provider>
   );
 }
 

@@ -88,8 +88,14 @@ describe("open_buzz", () => {
     const { host, roomCode } = await openRoom();
     const { player } = await joinPlayer(roomCode, "Alice");
 
-    const hostGetsRound = waitForEvent<RoundOpenedPayload>(host, "round_opened");
-    const playerGetsRound = waitForEvent<RoundOpenedPayload>(player, "round_opened");
+    const hostGetsRound = waitForEvent<RoundOpenedPayload>(
+      host,
+      "round_opened",
+    );
+    const playerGetsRound = waitForEvent<RoundOpenedPayload>(
+      player,
+      "round_opened",
+    );
 
     host.emit("open_buzz", { buzzMode: "button" });
 
@@ -155,15 +161,26 @@ describe("buzz", () => {
     await waitForEvent(host, "round_opened");
 
     // Emit first buzz, wait for it to be processed before the second
-    const firstUpdate = waitForEvent<BuzzOrderUpdatedPayload>(host, "buzz_order_updated");
-    p1.emit("buzz", { mode: "button", localTime: Date.now(), adjustedTime: Date.now() });
+    const firstUpdate = waitForEvent<BuzzOrderUpdatedPayload>(
+      host,
+      "buzz_order_updated",
+    );
+    p1.emit("buzz", {
+      mode: "button",
+      localTime: Date.now(),
+      adjustedTime: Date.now(),
+    });
     await firstUpdate;
 
     const secondUpdate = waitForEvent<BuzzOrderUpdatedPayload>(
       host,
       "buzz_order_updated",
     );
-    p2.emit("buzz", { mode: "button", localTime: Date.now(), adjustedTime: Date.now() });
+    p2.emit("buzz", {
+      mode: "button",
+      localTime: Date.now(),
+      adjustedTime: Date.now(),
+    });
     const update = await secondUpdate;
 
     expect(update.buzzOrder).toHaveLength(2);
@@ -210,7 +227,10 @@ describe("buzz", () => {
     host.emit("close_buzz");
     await waitForEvent(host, "round_closed");
 
-    const penalty = waitForEvent<EarlyBuzzPenaltyPayload>(player, "early_buzz_penalty");
+    const penalty = waitForEvent<EarlyBuzzPenaltyPayload>(
+      player,
+      "early_buzz_penalty",
+    );
     player.emit("buzz", {
       mode: "button",
       localTime: Date.now(),
@@ -298,15 +318,26 @@ describe("advance_queue — wrong", () => {
 
     // Both buzz in order
     const firstBuzz = waitForEvent(host, "buzz_order_updated");
-    p1.emit("buzz", { mode: "button", localTime: Date.now(), adjustedTime: Date.now() });
+    p1.emit("buzz", {
+      mode: "button",
+      localTime: Date.now(),
+      adjustedTime: Date.now(),
+    });
     await firstBuzz;
 
     const secondBuzz = waitForEvent(host, "buzz_order_updated");
-    p2.emit("buzz", { mode: "button", localTime: Date.now(), adjustedTime: Date.now() });
+    p2.emit("buzz", {
+      mode: "button",
+      localTime: Date.now(),
+      adjustedTime: Date.now(),
+    });
     await secondBuzz;
 
     // Host marks Alice wrong
-    const update = waitForEvent<BuzzOrderUpdatedPayload>(host, "buzz_order_updated");
+    const update = waitForEvent<BuzzOrderUpdatedPayload>(
+      host,
+      "buzz_order_updated",
+    );
     host.emit("advance_queue", { result: "wrong" });
     const payload = await update;
 

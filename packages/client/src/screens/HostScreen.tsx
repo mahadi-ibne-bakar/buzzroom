@@ -45,14 +45,17 @@ export function HostScreen() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-slate-400 text-xs uppercase tracking-wider">Room code</div>
+          <div className="text-slate-400 text-xs uppercase tracking-wider">
+            Room code
+          </div>
           <div className="text-3xl font-bold tracking-widest text-white">
             {room.roomCode}
           </div>
         </div>
         <div className="text-right">
           <div className="text-slate-400 text-xs">
-            {connectedPlayers.length} player{connectedPlayers.length !== 1 ? "s" : ""}
+            {connectedPlayers.length} player
+            {connectedPlayers.length !== 1 ? "s" : ""}
           </div>
           <button
             onClick={() => dispatch({ type: "LEAVE" })}
@@ -100,7 +103,9 @@ export function HostScreen() {
             key={t}
             onClick={() => setTab(t)}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === t ? "bg-slate-600 text-white" : "text-slate-400 hover:text-white"
+              tab === t
+                ? "bg-slate-600 text-white"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             {t === "round" ? "Round" : "Scores"}

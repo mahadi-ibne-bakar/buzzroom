@@ -96,7 +96,9 @@ describe("processBuzz — adjustedTime ordering", () => {
     processBuzz(round, "p1", "Alice", serverNow, futureTime, true);
 
     // Clamped to serverNow + 2000
-    expect(round.buzzOrder[0]!.adjustedTime).toBeLessThanOrEqual(serverNow + 2_000);
+    expect(round.buzzOrder[0]!.adjustedTime).toBeLessThanOrEqual(
+      serverNow + 2_000,
+    );
   });
 });
 

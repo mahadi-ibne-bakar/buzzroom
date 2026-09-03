@@ -7,7 +7,10 @@ import {
   type ReactNode,
 } from "react";
 import { io, type Socket } from "socket.io-client";
-import type { ClientToServerEvents, ServerToClientEvents } from "@buzzroom/shared";
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+} from "@buzzroom/shared";
 
 type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 interface SocketContextValue {
@@ -17,7 +20,8 @@ interface SocketContextValue {
 const SocketContext = createContext<SocketContextValue | null>(null);
 
 const SERVER_URL =
-  (import.meta.env?.VITE_SERVER_URL as string | undefined) ?? "http://localhost:3001";
+  (import.meta.env?.VITE_SERVER_URL as string | undefined) ??
+  "http://localhost:3001";
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<AppSocket>(

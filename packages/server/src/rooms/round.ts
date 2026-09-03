@@ -100,7 +100,9 @@ function reRankAndDetectTies(buzzOrder: BuzzEntry[]): void {
   for (let i = 0; i < buzzOrder.length - 1; i++) {
     const curr = buzzOrder[i]!;
     const next = buzzOrder[i + 1]!;
-    if (Math.abs(curr.adjustedTime - next.adjustedTime) < NEAR_TIE_THRESHOLD_MS) {
+    if (
+      Math.abs(curr.adjustedTime - next.adjustedTime) < NEAR_TIE_THRESHOLD_MS
+    ) {
       curr.nearTie = true;
       next.nearTie = true;
     }
@@ -162,7 +164,10 @@ export function processBuzz(
 
   const lockout = round.lockouts.get(playerId);
   if (lockout !== undefined && lockout.lockedUntil > serverTime) {
-    return { type: "locked_out", remainingMs: lockout.lockedUntil - serverTime };
+    return {
+      type: "locked_out",
+      remainingMs: lockout.lockedUntil - serverTime,
+    };
   }
 
   // Clamp the claimed adjustedTime before recording it.
@@ -191,11 +196,18 @@ export function processBuzz(
 // ── Queue advancement ─────────────────────────────────────────────────────
 
 export type AdvanceResult =
-  | { type: "wrong"; eliminatedEntry: BuzzEntry; nextActiveEntry: BuzzEntry | null }
+  | {
+      type: "wrong";
+      eliminatedEntry: BuzzEntry;
+      nextActiveEntry: BuzzEntry | null;
+    }
   | { type: "correct"; winnerEntry: BuzzEntry }
   | { type: "no_active_player" };
 
-export function advanceQueue(round: Round, result: "correct" | "wrong"): AdvanceResult {
+export function advanceQueue(
+  round: Round,
+  result: "correct" | "wrong",
+): AdvanceResult {
   const activeEntry = getActiveEntry(round);
   if (!activeEntry) return { type: "no_active_player" };
 

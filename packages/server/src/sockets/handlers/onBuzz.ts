@@ -1,5 +1,9 @@
 import type { BuzzPayload } from "@buzzroom/shared";
-import { processBuzz, getActiveEntry, toBuzzEntryView } from "../../rooms/round.js";
+import {
+  processBuzz,
+  getActiveEntry,
+  toBuzzEntryView,
+} from "../../rooms/round.js";
 import type { RoomStore } from "../../rooms/RoomStore.js";
 import type { TypedServer, TypedSocket } from "../../socketTypes.js";
 

@@ -22,7 +22,10 @@ export function LandingScreen() {
     setBusy(true);
     socket.connect();
     socket.once("connect", () => {
-      socket.emit("join_room", { roomCode: code.toUpperCase(), playerName: name.trim() });
+      socket.emit("join_room", {
+        roomCode: code.toUpperCase(),
+        playerName: name.trim(),
+      });
     });
   };
 
@@ -84,12 +87,16 @@ export function LandingScreen() {
 
         {!isHost && (
           <div>
-            <label className="block text-slate-400 text-sm mb-1">Room code</label>
+            <label className="block text-slate-400 text-sm mb-1">
+              Room code
+            </label>
             <input
               className="w-full bg-slate-800 text-white rounded-xl px-4 py-3 text-lg tracking-widest uppercase outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="6-letter code"
               value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 6))}
+              onChange={(e) =>
+                setCode(e.target.value.toUpperCase().slice(0, 6))
+              }
               maxLength={6}
             />
           </div>
