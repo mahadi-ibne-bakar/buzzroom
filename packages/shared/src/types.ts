@@ -14,14 +14,17 @@ export interface BuzzEntryView {
   rank: number;
   playerId: string;
   playerName: string;
-  eliminated: boolean; // true after the host marks this player wrong
+  eliminated: boolean;
+  // Phase 5 additions — exposed to the host for transparency:
+  adjustedTime: number; // estimated server-clock time of the buzz
+  nearTie: boolean; // true if within NEAR_TIE_THRESHOLD_MS of an adjacent entry
 }
 
 export interface RoundView {
   roundId: string;
   status: "open" | "closed";
   buzzMode: "button"; // will expand to "slide" | "pattern" in Phase 8
-  activePlayerId: string | null; // first non-eliminated player; null if none
+  activePlayerId: string | null;
   buzzOrder: BuzzEntryView[];
 }
 
@@ -30,5 +33,5 @@ export interface RoomView {
   roomCode: string;
   hostPlayerId: string;
   players: PlayerView[];
-  round: RoundView | null; // null = no buzz round currently active
+  round: RoundView | null;
 }

@@ -1,9 +1,5 @@
 import type { BuzzPayload } from "@buzzroom/shared";
-import {
-  processBuzz,
-  getActiveEntry,
-  toBuzzEntryView,
-} from "../../rooms/round.js";
+import { processBuzz, getActiveEntry, toBuzzEntryView } from "../../rooms/round.js";
 import type { RoomStore } from "../../rooms/RoomStore.js";
 import type { TypedServer, TypedSocket } from "../../socketTypes.js";
 
@@ -11,7 +7,7 @@ export function onBuzz(
   io: TypedServer,
   socket: TypedSocket,
   store: RoomStore,
-  _payload: BuzzPayload, // mode field will matter in Phase 8
+  payload: BuzzPayload,
 ): void {
   const context = store.getPlayerBySocketId(socket.id);
   if (!context) {
@@ -33,18 +29,21 @@ export function onBuzz(
   }
 
   const serverTime = Date.now();
+
+  // Pass payload.adjustedTime to processBuzz.
+  // The function clamps it before storing, so a malicious client
+  // cannot win by backdating their timestamp.
   const result = processBuzz(
     room.round,
     player.playerId,
     player.name,
     serverTime,
+    payload.adjustedTime,
     room.settings.earlyBuzzPenalty,
   );
 
   switch (result.type) {
     case "accepted": {
-      // Broadcast the updated buzz order to every player in the room,
-      // including the buzzer — they need their rank visible on screen.
       const activeEntry = getActiveEntry(room.round);
       io.to(room.roomId).emit("buzz_order_updated", {
         roundId: room.round.roundId,
@@ -52,7 +51,12 @@ export function onBuzz(
         activePlayerId: activeEntry?.playerId ?? null,
       });
       console.log(
-        `[buzz] "${player.name}" rank ${result.entry.rank} in ${room.roomCode}`,
+        `[buzz] "${player.name}" rank ${result.entry.rank} ` +
+          `adjustedTime=${result.entry.adjustedTime} ` +
+          `arrival=${result.entry.serverArrivalTime} ` +
+          `drift=${result.entry.serverArrivalTime - result.entry.adjustedTime}ms ` +
+          `nearTie=${result.entry.nearTie} ` +
+          `in ${room.roomCode}`,
       );
       break;
     }
@@ -66,7 +70,6 @@ export function onBuzz(
     }
 
     case "locked_out": {
-      // Still locked from a previous penalty — reject silently with timing info
       socket.emit("server_error", {
         code: "INVALID_STATE",
         message: `Still locked out for ${result.remainingMs}ms.`,
@@ -75,8 +78,6 @@ export function onBuzz(
     }
 
     case "penalty_applied": {
-      // Only the offending player sees the penalty event; everyone else
-      // is unaware. The UI shakes/vibrates the buzzer button.
       socket.emit("early_buzz_penalty", {
         lockedForMs: result.lockedForMs,
         offenseCount: result.offenseCount,
@@ -89,7 +90,6 @@ export function onBuzz(
     }
 
     case "round_closed": {
-      // Round is closed and penalty is disabled — silent rejection
       socket.emit("server_error", {
         code: "INVALID_STATE",
         message: "The buzz window is closed.",

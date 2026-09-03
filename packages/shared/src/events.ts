@@ -1,13 +1,14 @@
 import type {
+  AdvanceQueuePayload,
+  BuzzPayload,
   CreateRoomPayload,
   JoinRoomPayload,
   OpenBuzzPayload,
-  BuzzPayload,
-  AdvanceQueuePayload,
+  SyncPingPayload,
 } from "./payloads.js";
-import type { BuzzEntryView, PlayerView, RoomView } from "./types.js";
+import type { BuzzEntryView, PlayerView, RoomView, RoundView } from "./types.js";
 
-// ---------- Server → Client payloads ----------
+// ── Server → Client payloads ──────────────────────────────────────────────
 
 export interface RoomCreatedPayload {
   room: RoomView;
@@ -29,22 +30,18 @@ export interface PlayerLeftPayload {
 }
 
 export interface RoundOpenedPayload {
-  round: RoundView; // full round state including mode
+  round: RoundView;
 }
 
-// Sent to ALL players whenever the buzz order changes (new buzz, or
-// a player gets eliminated). The client always gets the full list so
-// it never needs to do partial updates.
 export interface BuzzOrderUpdatedPayload {
   roundId: string;
   buzzOrder: BuzzEntryView[];
   activePlayerId: string | null;
 }
 
-// Sent only to the offending player's socket.
 export interface EarlyBuzzPenaltyPayload {
   lockedForMs: number;
-  offenseCount: number; // 1-based, so client can escalate feedback
+  offenseCount: number;
 }
 
 export interface RoundResolvedPayload {
@@ -53,14 +50,18 @@ export interface RoundResolvedPayload {
   pointsAwarded: number;
 }
 
-// Sent after any score change (correct answer, or future manual award).
 export interface ScoreUpdatePayload {
   players: PlayerView[];
 }
 
+// Phase 5: the server echoes the client's t0 and adds its own clock
+// reading so the client can compute: RTT = t1 - t0, offset = ts - (t0 + RTT/2)
+export interface SyncPongPayload {
+  t0: number; // echoed client timestamp
+  ts: number; // server clock at moment of processing the ping
+}
+
 export interface ServerErrorPayload {
-  // Machine-readable code the client can switch on, plus a human-readable
-  // message for display or logging.
   code:
     | "VALIDATION_ERROR"
     | "RATE_LIMITED"
@@ -75,21 +76,18 @@ export interface ServerErrorPayload {
   message: string;
 }
 
-// Re-export so callers don't need a separate import
 export type { RoundView } from "./types.js";
 
-// ---------- Socket.io event maps ----------
-// These drive TypeScript's autocomplete and type-checking for socket.on()
-// and socket.emit() calls on both sides of the connection.
+// ── Socket.io event maps ──────────────────────────────────────────────────
 
 export interface ServerToClientEvents {
-  // Room lifecycle (Phase 3)
+  // Room lifecycle
   room_created: (payload: RoomCreatedPayload) => void;
   join_ok: (payload: JoinOkPayload) => void;
   player_joined: (payload: PlayerJoinedPayload) => void;
   player_left: (payload: PlayerLeftPayload) => void;
 
-  // Buzz round lifecycle (Phase 4)
+  // Buzz round
   round_opened: (payload: RoundOpenedPayload) => void;
   round_closed: () => void;
   round_reset: () => void;
@@ -98,19 +96,25 @@ export interface ServerToClientEvents {
   round_resolved: (payload: RoundResolvedPayload) => void;
   score_update: (payload: ScoreUpdatePayload) => void;
 
+  // Clock sync (Phase 5)
+  sync_pong: (payload: SyncPongPayload) => void;
+
   // Errors
   server_error: (payload: ServerErrorPayload) => void;
 }
 
 export interface ClientToServerEvents {
-  // Room lifecycle (Phase 3)
+  // Room lifecycle
   create_room: (payload: CreateRoomPayload) => void;
   join_room: (payload: JoinRoomPayload) => void;
 
-  // Buzz round lifecycle (Phase 4)
+  // Buzz round
   open_buzz: (payload: OpenBuzzPayload) => void;
   close_buzz: () => void;
   reset_round: () => void;
   buzz: (payload: BuzzPayload) => void;
   advance_queue: (payload: AdvanceQueuePayload) => void;
+
+  // Clock sync (Phase 5)
+  sync_ping: (payload: SyncPingPayload) => void;
 }

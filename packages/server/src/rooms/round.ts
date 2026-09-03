@@ -1,35 +1,34 @@
 import { randomUUID } from "node:crypto";
 import type { BuzzEntryView, RoundView } from "@buzzroom/shared";
+import { NEAR_TIE_THRESHOLD_MS, MAX_CLOCK_SKEW_MS } from "../constants.js";
 
-// ---------- Internal server-side types ----------
-// NOT the client-facing View types. The view types are created by
-// toRoundView() at the point of sending, so internal fields like
-// lockouts and serverArrivalTime never reach the client.
+// ── Internal server-side types ────────────────────────────────────────────
 
 export interface BuzzEntry {
-  rank: number; // 1-based; set at the moment the buzz arrives
+  rank: number;
   playerId: string;
   playerName: string;
-  serverArrivalTime: number; // used for naive ordering in Phase 4
-  // replaced by adjustedTime in Phase 5 (fairness engine)
-  eliminated: boolean; // true after host marks this player wrong
+  serverArrivalTime: number; // when the packet reached the server (audit log)
+  adjustedTime: number; // client's latency-corrected estimate of true press time
+  eliminated: boolean;
+  nearTie: boolean; // within NEAR_TIE_THRESHOLD_MS of an adjacent entry
 }
 
 export interface EarlyBuzzLockout {
-  lockedUntil: number; // epoch ms; buzz attempts before this time are rejected
-  offenseCount: number; // how many times this player offended in this round
+  lockedUntil: number; // epoch ms
+  offenseCount: number;
 }
 
 export interface Round {
   roundId: string;
-  buzzMode: "button"; // expands in Phase 8
+  buzzMode: "button";
   status: "open" | "closed";
   openedAtServerTime: number;
-  buzzOrder: BuzzEntry[]; // sorted by serverArrivalTime, ascending
-  lockouts: Map<string, EarlyBuzzLockout>; // playerId → lockout
+  buzzOrder: BuzzEntry[];
+  lockouts: Map<string, EarlyBuzzLockout>;
 }
 
-// ---------- Factory ----------
+// ── Factory ───────────────────────────────────────────────────────────────
 
 export function createRound(buzzMode: "button"): Round {
   return {
@@ -42,21 +41,74 @@ export function createRound(buzzMode: "button"): Round {
   };
 }
 
-// ---------- Queries ----------
+// ── Queries ───────────────────────────────────────────────────────────────
 
-/**
- * Returns the first non-eliminated player in the buzz order, or null if
- * everyone has been eliminated or the order is empty. This is the player
- * who should currently be answering.
- */
 export function getActiveEntry(round: Round): BuzzEntry | null {
   return round.buzzOrder.find((e) => !e.eliminated) ?? null;
 }
 
-// ---------- Buzz processing ----------
+// ── Fairness helpers ──────────────────────────────────────────────────────
 
-// Penalty durations in ms for the 1st, 2nd, 3rd+ offenses within a round.
-// Escalating so that repeated jump-buzzing becomes increasingly costly.
+/**
+ * Clamps a client's claimed adjustedTime to a safe range:
+ *
+ *  floor = round.openedAtServerTime - 100ms
+ *      A legitimate buzz can't have happened before the round opened.
+ *      The 100ms buffer absorbs clock-estimation error on the client side
+ *      so honest players near the boundary don't get their timestamps
+ *      artificially raised to the open time.
+ *
+ *  ceiling = serverNow + MAX_CLOCK_SKEW_MS
+ *      Rejects claims that the buzz happened in the future.
+ *
+ * Why clamp at all if the client computes the offset honestly?
+ *   A malicious client could set adjustedTime = openedAtServerTime - 999999
+ *   and always "win." Clamping makes that attack useless.
+ */
+function clampAdjustedTime(
+  claimed: number,
+  openedAtServerTime: number,
+  serverNow: number,
+): number {
+  const floor = openedAtServerTime - 100;
+  const ceiling = serverNow + MAX_CLOCK_SKEW_MS;
+  return Math.max(floor, Math.min(ceiling, claimed));
+}
+
+/**
+ * After adding or modifying any entry, call this to keep the buzz order
+ * sorted by adjustedTime and both rank and nearTie values consistent.
+ *
+ * Why re-sort on every buzz rather than insert in order?
+ *  The first packet to arrive at the server might not have the lowest
+ *  adjustedTime — that's the whole point of Phase 5. Sorting on every
+ *  new entry is O(n log n) in the number of players, which at ≤20 players
+ *  is negligible. Correctness over micro-optimisation.
+ */
+function reRankAndDetectTies(buzzOrder: BuzzEntry[]): void {
+  buzzOrder.sort((a, b) => a.adjustedTime - b.adjustedTime);
+
+  for (let i = 0; i < buzzOrder.length; i++) {
+    const entry = buzzOrder[i]!;
+    entry.rank = i + 1;
+    entry.nearTie = false; // reset; re-computed below
+  }
+
+  // Mark adjacent entries as near-ties when their adjustedTimes are
+  // indistinguishably close. We mark BOTH entries so the host can see
+  // the full set of players involved in the tie.
+  for (let i = 0; i < buzzOrder.length - 1; i++) {
+    const curr = buzzOrder[i]!;
+    const next = buzzOrder[i + 1]!;
+    if (Math.abs(curr.adjustedTime - next.adjustedTime) < NEAR_TIE_THRESHOLD_MS) {
+      curr.nearTie = true;
+      next.nearTie = true;
+    }
+  }
+}
+
+// ── Buzz processing ───────────────────────────────────────────────────────
+
 const PENALTY_DURATIONS_MS = [500, 1_000, 1_500] as const;
 
 function getPenaltyMs(offenseCount: number): number {
@@ -73,19 +125,20 @@ export type BuzzResult =
 
 /**
  * Processes a buzz attempt. Mutates the round in place on acceptance or
- * penalty — callers should not assume the round is unchanged after calling.
+ * penalty.
  *
- * @param earlyPenaltyEnabled  Whether to apply a penalty for buzzing while
- *                             the round is closed (host setting).
+ * @param adjustedTime  Client's latency-corrected press time. The server
+ *                      clamps this before using it for ranking.
  */
 export function processBuzz(
   round: Round,
   playerId: string,
   playerName: string,
   serverTime: number,
+  adjustedTime: number,
   earlyPenaltyEnabled: boolean,
 ): BuzzResult {
-  // ---------- Round is closed ----------
+  // ── Round is closed ──
   if (round.status === "closed") {
     if (!earlyPenaltyEnabled) return { type: "round_closed" };
 
@@ -101,72 +154,62 @@ export function processBuzz(
     return { type: "penalty_applied", lockedForMs, offenseCount };
   }
 
-  // ---------- Round is open ----------
+  // ── Round is open ──
 
-  // Already in the queue — duplicate buzz
   if (round.buzzOrder.some((e) => e.playerId === playerId)) {
     return { type: "already_buzzed" };
   }
 
-  // Still locked out from a previous penalty in this round
   const lockout = round.lockouts.get(playerId);
   if (lockout !== undefined && lockout.lockedUntil > serverTime) {
-    return {
-      type: "locked_out",
-      remainingMs: lockout.lockedUntil - serverTime,
-    };
+    return { type: "locked_out", remainingMs: lockout.lockedUntil - serverTime };
   }
 
+  // Clamp the claimed adjustedTime before recording it.
+  const safeAdjustedTime = clampAdjustedTime(
+    adjustedTime,
+    round.openedAtServerTime,
+    serverTime,
+  );
+
   const entry: BuzzEntry = {
-    rank: round.buzzOrder.length + 1,
+    rank: 0, // assigned by reRankAndDetectTies below
     playerId,
     playerName,
     serverArrivalTime: serverTime,
+    adjustedTime: safeAdjustedTime,
     eliminated: false,
+    nearTie: false,
   };
 
   round.buzzOrder.push(entry);
+  reRankAndDetectTies(round.buzzOrder);
+
   return { type: "accepted", entry };
 }
 
-// ---------- Queue advancement ----------
+// ── Queue advancement ─────────────────────────────────────────────────────
 
 export type AdvanceResult =
-  | {
-      type: "wrong";
-      eliminatedEntry: BuzzEntry;
-      nextActiveEntry: BuzzEntry | null;
-    }
+  | { type: "wrong"; eliminatedEntry: BuzzEntry; nextActiveEntry: BuzzEntry | null }
   | { type: "correct"; winnerEntry: BuzzEntry }
   | { type: "no_active_player" };
 
-/**
- * Handles the host marking a player correct or wrong.
- * - "correct": closes the round and returns the winner.
- * - "wrong": eliminates the active player and returns the next one.
- *
- * Mutates the round in place.
- */
-export function advanceQueue(
-  round: Round,
-  result: "correct" | "wrong",
-): AdvanceResult {
+export function advanceQueue(round: Round, result: "correct" | "wrong"): AdvanceResult {
   const activeEntry = getActiveEntry(round);
   if (!activeEntry) return { type: "no_active_player" };
 
   if (result === "correct") {
-    // Closing the round here prevents any more buzzes from sneaking in.
     round.status = "closed";
     return { type: "correct", winnerEntry: activeEntry };
   }
 
-  // Wrong: eliminate this player, find the next one in line
   activeEntry.eliminated = true;
   const nextActiveEntry = getActiveEntry(round);
   return { type: "wrong", eliminatedEntry: activeEntry, nextActiveEntry };
 }
 
-// ---------- View conversion ----------
+// ── View conversion ───────────────────────────────────────────────────────
 
 export function toBuzzEntryView(entry: BuzzEntry): BuzzEntryView {
   return {
@@ -174,6 +217,8 @@ export function toBuzzEntryView(entry: BuzzEntry): BuzzEntryView {
     playerId: entry.playerId,
     playerName: entry.playerName,
     eliminated: entry.eliminated,
+    adjustedTime: entry.adjustedTime,
+    nearTie: entry.nearTie,
   };
 }
 

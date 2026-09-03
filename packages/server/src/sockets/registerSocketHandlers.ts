@@ -1,35 +1,31 @@
 import {
+  AdvanceQueuePayloadSchema,
+  BuzzPayloadSchema,
   CreateRoomPayloadSchema,
   JoinRoomPayloadSchema,
   OpenBuzzPayloadSchema,
-  BuzzPayloadSchema,
-  AdvanceQueuePayloadSchema,
+  SyncPingPayloadSchema,
 } from "@buzzroom/shared";
 import type { RoomStore } from "../rooms/RoomStore.js";
 import type { TypedServer } from "../socketTypes.js";
+import { onAdvanceQueue } from "./handlers/onAdvanceQueue.js";
+import { onBuzz } from "./handlers/onBuzz.js";
+import { onCloseBuzz } from "./handlers/onCloseBuzz.js";
 import { onCreateRoom } from "./handlers/onCreateRoom.js";
 import { onDisconnect } from "./handlers/onDisconnect.js";
 import { onJoinRoom } from "./handlers/onJoinRoom.js";
 import { onOpenBuzz } from "./handlers/onOpenBuzz.js";
-import { onCloseBuzz } from "./handlers/onCloseBuzz.js";
 import { onResetRound } from "./handlers/onResetRound.js";
-import { onBuzz } from "./handlers/onBuzz.js";
-import { onAdvanceQueue } from "./handlers/onAdvanceQueue.js";
+import { onSyncPing } from "./handlers/onSyncPing.js";
 import { SocketRateLimiter } from "./rateLimiter.js";
 
-export function registerSocketHandlers(
-  io: TypedServer,
-  store: RoomStore,
-): void {
+export function registerSocketHandlers(io: TypedServer, store: RoomStore): void {
   io.on("connection", (socket) => {
     console.log(`socket connected: ${socket.id}`);
 
-    // One limiter instance per connection — no shared state between clients.
     const limiter = new SocketRateLimiter();
 
-    // ----------------------------------------------------------------
-    // Helpers: keeps the per-event boilerplate short
-    // ----------------------------------------------------------------
+    // ── Helpers ───────────────────────────────────────────────────────────
 
     function rateCheck(event: string, max: number, windowMs = 60_000): boolean {
       if (!limiter.check(event, max, windowMs)) {
@@ -44,9 +40,7 @@ export function registerSocketHandlers(
 
     function validate<T>(
       schema: {
-        safeParse: (
-          v: unknown,
-        ) => { success: true; data: T } | { success: false };
+        safeParse: (v: unknown) => { success: true; data: T } | { success: false };
       },
       payload: unknown,
     ): T | null {
@@ -61,9 +55,7 @@ export function registerSocketHandlers(
       return result.data;
     }
 
-    // ----------------------------------------------------------------
-    // Phase 3 — room lifecycle
-    // ----------------------------------------------------------------
+    // ── Phase 3: room lifecycle ───────────────────────────────────────────
 
     socket.on("create_room", (payload) => {
       if (!rateCheck("create_room", 3)) return;
@@ -79,9 +71,7 @@ export function registerSocketHandlers(
       onJoinRoom(io, socket, store, data);
     });
 
-    // ----------------------------------------------------------------
-    // Phase 4 — buzz round lifecycle
-    // ----------------------------------------------------------------
+    // ── Phase 4: buzz round lifecycle ─────────────────────────────────────
 
     socket.on("open_buzz", (payload) => {
       if (!rateCheck("open_buzz", 60)) return;
@@ -90,7 +80,6 @@ export function registerSocketHandlers(
       onOpenBuzz(io, socket, store, data);
     });
 
-    // close_buzz and reset_round carry no payload — nothing to validate.
     socket.on("close_buzz", () => {
       if (!rateCheck("close_buzz", 60)) return;
       onCloseBuzz(io, socket, store);
@@ -101,7 +90,6 @@ export function registerSocketHandlers(
       onResetRound(io, socket, store);
     });
 
-    // Players can buzz many times across a game; generous limit per minute.
     socket.on("buzz", (payload) => {
       if (!rateCheck("buzz", 30)) return;
       const data = validate(BuzzPayloadSchema, payload);
@@ -116,9 +104,18 @@ export function registerSocketHandlers(
       onAdvanceQueue(io, socket, store, data);
     });
 
-    // ----------------------------------------------------------------
-    // Disconnect
-    // ----------------------------------------------------------------
+    // ── Phase 5: clock sync ───────────────────────────────────────────────
+    // Clients ping on a ~2s heartbeat; allow up to 60/min (2× expected rate)
+    // to give headroom for reconnect bursts and catch-up syncing on join.
+
+    socket.on("sync_ping", (payload) => {
+      if (!rateCheck("sync_ping", 60)) return;
+      const data = validate(SyncPingPayloadSchema, payload);
+      if (!data) return;
+      onSyncPing(socket, store, data);
+    });
+
+    // ── Disconnect ────────────────────────────────────────────────────────
 
     socket.on("disconnect", (reason) => {
       console.log(`socket disconnected: ${socket.id} (${reason})`);
