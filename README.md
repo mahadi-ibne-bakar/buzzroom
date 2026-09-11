@@ -108,13 +108,15 @@ cp packages/server/.env.example packages/server/.env
 
 | Command                | What it does                                         |
 | ---------------------- | ---------------------------------------------------- |
+| `npm run build`        | Build the client bundle and the server bundle        |
+| `npm start`            | Run the built server (serves the client too)         |
 | `npm run lint`         | Lint every package                                   |
 | `npm run typecheck`    | Type-check every package                             |
 | `npm run format`       | Auto-format every package with Prettier              |
 | `npm run format:check` | Check formatting without changing files (used in CI) |
 | `npm test`             | Run tests in every package that has them             |
 
-## Running it
+## Running it in development
 
 Two terminals, from the repo root:
 
@@ -132,3 +134,47 @@ http://localhost:3001/health` to check) and the client on
 sides: host a game in one, join with the room code in the other.
 
 Point the client at a different backend with `VITE_SERVER_URL`.
+
+## Deploying
+
+```bash
+npm ci
+npm run build
+npm start
+```
+
+That is the whole thing: `npm run build` produces a static client bundle and
+a single bundled server file, and `npm start` runs the server, which serves
+the client itself. One process, one port, one origin.
+
+Serving both halves together is what makes the deployment boring. There is no
+CORS to configure, no build-time API URL to bake in — the client opens its
+socket against whatever origin it was served from — and the PWA, the service
+worker and the socket all agree on scope for free.
+
+**What the host needs**
+
+- A platform that keeps long-lived WebSocket connections open — Render,
+  Fly.io, Railway, or any VPS. Not pure serverless functions, which are built
+  for short requests and will drop the socket.
+- Node 22 or newer.
+- `PORT` — set by most platforms automatically; defaults to 3001.
+- Nothing else. `CLIENT_ORIGIN` only matters if you deliberately serve the
+  client from somewhere else, and `CLIENT_DIST` only if you rearrange the
+  files. See `packages/server/.env.example`.
+
+`GET /health` returns 200 with uptime, for the platform's health check.
+
+**Docker**
+
+A multi-stage `Dockerfile` is included and expects no configuration:
+
+```bash
+docker build -t buzzroom .
+docker run -p 3001:3001 buzzroom
+```
+
+**One caveat on scale**: room state lives in memory in a single process, so
+run exactly one instance. Two instances would each hold their own rooms and
+players would land on whichever answered — see the Redis note above for what
+running more would actually take.

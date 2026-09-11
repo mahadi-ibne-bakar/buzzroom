@@ -19,3 +19,7 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm test
+      # Catches a broken production build, which the other steps don't: the
+      # server is bundled and the client is compiled by Vite, and neither path
+      # is exercised by tsc or vitest.
+      - run: npm run build

@@ -19,9 +19,18 @@ interface SocketContextValue {
 }
 const SocketContext = createContext<SocketContextValue | null>(null);
 
-const SERVER_URL =
-  (import.meta.env?.VITE_SERVER_URL as string | undefined) ??
-  "http://localhost:3001";
+/**
+ * Where to reach the server.
+ *
+ * In production the server serves this bundle, so the socket belongs on the
+ * same origin -- passing undefined is how socket.io is told that, and it
+ * means a deployment needs no build-time configuration at all. In
+ * development the two halves are on different ports, so it falls back to the
+ * server's default. VITE_SERVER_URL overrides either.
+ */
+const SERVER_URL: string | undefined =
+  (import.meta.env.VITE_SERVER_URL as string | undefined) ??
+  (import.meta.env.DEV ? "http://localhost:3001" : undefined);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   // Lazily created on first render and never again. Passing io(...) straight

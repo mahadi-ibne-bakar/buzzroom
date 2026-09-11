@@ -8,6 +8,8 @@
     "packages/*"
   ],
   "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "start": "npm start -w @buzzroom/server",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
