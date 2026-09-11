@@ -1,4 +1,5 @@
 import { useGame } from "../contexts/GameContext.js";
+import { AudienceVote } from "../components/AudienceVote.js";
 import { JoinQrCode } from "../components/JoinQrCode.js";
 import { TeamLeaderboard } from "../components/TeamLeaderboard.js";
 
@@ -12,7 +13,7 @@ import { TeamLeaderboard } from "../components/TeamLeaderboard.js";
  */
 export function PresenterScreen() {
   const { state } = useGame();
-  const { room, leaderboard, teamLeaderboard, roundResult } = state;
+  const { room, leaderboard, teamLeaderboard, roundResult, voteTally } = state;
 
   if (!room) {
     return (
@@ -82,6 +83,17 @@ export function PresenterScreen() {
             <h2 className="text-slate-500 text-xl uppercase tracking-[0.2em]">
               Buzz order
             </h2>
+            {room.settings.audienceVoting && (
+              <AudienceVote
+                tally={voteTally}
+                activeName={
+                  room.players.find(
+                    (p) => p.playerId === voteTally.activePlayerId,
+                  )?.name ?? null
+                }
+                large
+              />
+            )}
             {buzzOrder.length === 0 ? (
               <p className="text-3xl text-slate-600">
                 {round

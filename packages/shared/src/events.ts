@@ -2,6 +2,7 @@ import type {
   AdvanceQueuePayload,
   AssignTeamPayload,
   AwardPointsPayload,
+  CastVotePayload,
   CreateTeamPayload,
   DeleteTeamPayload,
   BuzzPayload,
@@ -22,6 +23,7 @@ import type {
   RoundView,
   TeamLeaderboardEntry,
   TeamView,
+  VoteTally,
 } from "./types.js";
 
 export interface RoomCreatedPayload {
@@ -63,6 +65,9 @@ export interface ScoreUpdatePayload {
   // so this is derived from the same player scores rather than tracked
   // separately -- there is only ever one place a point lives.
   teamLeaderboard: TeamLeaderboardEntry[];
+}
+export interface VoteTallyPayload {
+  tally: VoteTally;
 }
 export interface TeamsUpdatedPayload {
   teams: TeamView[];
@@ -109,6 +114,8 @@ export type {
   RoomSettingsView,
   TeamView,
   TeamLeaderboardEntry,
+  AudienceVote,
+  VoteTally,
 } from "./types.js";
 
 export interface ServerToClientEvents {
@@ -126,6 +133,7 @@ export interface ServerToClientEvents {
   sync_pong: (p: SyncPongPayload) => void;
   settings_updated: (p: SettingsUpdatedPayload) => void;
   teams_updated: (p: TeamsUpdatedPayload) => void;
+  vote_tally: (p: VoteTallyPayload) => void;
   ping_update: (p: PingUpdatePayload) => void;
   host_left: () => void;
   reconnect_ok: (p: ReconnectOkPayload) => void;
@@ -149,4 +157,5 @@ export interface ClientToServerEvents {
   create_team: (p: CreateTeamPayload) => void;
   delete_team: (p: DeleteTeamPayload) => void;
   assign_team: (p: AssignTeamPayload) => void;
+  cast_vote: (p: CastVotePayload) => void;
 }

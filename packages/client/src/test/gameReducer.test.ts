@@ -4,7 +4,7 @@ import {
   type GameState,
   type GameAction,
 } from "../contexts/GameContext.js";
-import type { PlayerView, RoomView } from "@buzzroom/shared";
+import type { PlayerView, RoomSettingsView, RoomView } from "@buzzroom/shared";
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -19,7 +19,25 @@ const initial: GameState = {
   roundResult: null,
   lockout: null,
   pings: {},
+  voteTally: { activePlayerId: null, agree: 0, disagree: 0 },
+  myVote: null,
 };
+
+/**
+ * RoomSettingsView with every flag defaulted, so a new setting doesn't mean
+ * editing every fixture that happens to build a room.
+ */
+function makeSettings(
+  overrides: Partial<RoomSettingsView> = {},
+): RoomSettingsView {
+  return {
+    buzzWindowMode: "locked",
+    earlyBuzzPenalty: true,
+    teamsEnabled: false,
+    audienceVoting: false,
+    ...overrides,
+  };
+}
 
 /**
  * A PlayerView with the fields a reducer test actually cares about. Every
@@ -41,11 +59,7 @@ function makeRoom(overrides: Partial<RoomView> = {}): RoomView {
     roomId: "room-1",
     roomCode: "ABCDEF",
     hostPlayerId: "host-1",
-    settings: {
-      buzzWindowMode: "locked",
-      earlyBuzzPenalty: true,
-      teamsEnabled: false,
-    },
+    settings: makeSettings(),
     teams: [],
     players: [makePlayer("host-1", "Host", 0)],
     round: null,
@@ -458,11 +472,10 @@ describe("SETTINGS_UPDATED", () => {
 
     const next = dispatch(joined, {
       type: "SETTINGS_UPDATED",
-      settings: {
+      settings: makeSettings({
         buzzWindowMode: "free",
         earlyBuzzPenalty: false,
-        teamsEnabled: false,
-      },
+      }),
     });
 
     expect(next.room?.settings.buzzWindowMode).toBe("free");
@@ -472,11 +485,10 @@ describe("SETTINGS_UPDATED", () => {
   it("is a no-op before a room exists", () => {
     const next = dispatch(initial, {
       type: "SETTINGS_UPDATED",
-      settings: {
+      settings: makeSettings({
         buzzWindowMode: "free",
         earlyBuzzPenalty: true,
-        teamsEnabled: false,
-      },
+      }),
     });
     expect(next).toBe(initial);
   });

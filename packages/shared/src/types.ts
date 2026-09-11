@@ -27,9 +27,22 @@ export interface PlayerView {
  */
 export type BuzzWindowMode = "free" | "locked";
 
+export type AudienceVote = "agree" | "disagree";
+
+export interface VoteTally {
+  /** Who the audience is voting on, or null when nobody has been called on. */
+  activePlayerId: string | null;
+  agree: number;
+  disagree: number;
+}
+
 export interface RoomSettingsView {
   buzzWindowMode: BuzzWindowMode;
   earlyBuzzPenalty: boolean;
+  // When on, everyone except the player who has been called on can register
+  // agree/disagree while the host decides. Advisory only -- it never changes
+  // a score.
+  audienceVoting: boolean;
   // When on, the leaderboard ranks teams instead of individuals. Player
   // scores still exist underneath -- a team's score is the sum of its
   // members' -- so switching modes never loses anything.

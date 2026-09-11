@@ -82,6 +82,7 @@ describe("room settings", () => {
       buzzWindowMode: "locked",
       earlyBuzzPenalty: true,
       teamsEnabled: false,
+      audienceVoting: false,
     });
   });
 

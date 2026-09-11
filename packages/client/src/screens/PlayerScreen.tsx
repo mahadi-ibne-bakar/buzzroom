@@ -1,6 +1,7 @@
 import { useGame } from "../contexts/GameContext.js";
 import { useSocket } from "../contexts/SocketContext.js";
 import { useClockSync } from "../hooks/useClockSync.js";
+import { AudienceVote } from "../components/AudienceVote.js";
 import { BuzzOrder } from "../components/BuzzOrder.js";
 import { Leaderboard } from "../components/Leaderboard.js";
 import { PingIndicator } from "../components/PingIndicator.js";
@@ -44,6 +45,8 @@ export function PlayerScreen() {
     roundResult,
     lockout,
     pings,
+    voteTally,
+    myVote,
   } = state;
   const roundOpen = room?.round?.status === "open";
   const freeBuzz = room?.settings.buzzWindowMode === "free";
@@ -211,6 +214,31 @@ export function PlayerScreen() {
                   myRank={myRank}
                   lockoutSecondsLeft={lockoutSecondsLeft}
                 />
+              )}
+
+              {/* Audience vote on whoever has been called on */}
+              {room.settings.audienceVoting && (
+                <div className="w-full">
+                  <AudienceVote
+                    tally={voteTally}
+                    activeName={
+                      room.players.find(
+                        (p) => p.playerId === voteTally.activePlayerId,
+                      )?.name ?? null
+                    }
+                    myVote={myVote}
+                    // The player being voted on doesn't get buttons -- the
+                    // server rejects self-votes, so don't offer them.
+                    onVote={
+                      voteTally.activePlayerId === myPlayerId
+                        ? undefined
+                        : (vote) => {
+                            socket.emit("cast_vote", { vote });
+                            dispatch({ type: "MY_VOTE", vote });
+                          }
+                    }
+                  />
+                </div>
               )}
 
               {/* Buzz order below buzzer */}

@@ -3,6 +3,7 @@ import type { BuzzMode, BuzzWindowMode } from "@buzzroom/shared";
 import { useGame } from "../contexts/GameContext.js";
 import { useSocket } from "../contexts/SocketContext.js";
 import { useClockSync } from "../hooks/useClockSync.js";
+import { AudienceVote } from "../components/AudienceVote.js";
 import { BuzzOrder } from "../components/BuzzOrder.js";
 import { JoinQrCode } from "../components/JoinQrCode.js";
 import { Leaderboard } from "../components/Leaderboard.js";
@@ -32,9 +33,20 @@ export function HostScreen() {
   const [roundPoints, setRoundPoints] = useState("1");
   const [tab, setTab] = useState<"round" | "scores">("round");
 
-  const { room, myPlayerId, leaderboard, teamLeaderboard, roundResult, pings } =
-    state;
+  const {
+    room,
+    myPlayerId,
+    leaderboard,
+    teamLeaderboard,
+    roundResult,
+    pings,
+    voteTally,
+  } = state;
   if (!room) return null;
+
+  const votedOnName =
+    room.players.find((p) => p.playerId === voteTally.activePlayerId)?.name ??
+    null;
 
   const settings = room.settings;
   const setWindowMode = (buzzWindowMode: BuzzWindowMode) =>
@@ -181,6 +193,19 @@ export function HostScreen() {
             <label className="flex items-center gap-2 text-slate-400 text-xs">
               <input
                 type="checkbox"
+                checked={settings.audienceVoting}
+                onChange={(e) =>
+                  socket.emit("update_settings", {
+                    audienceVoting: e.target.checked,
+                  })
+                }
+                className="accent-indigo-500"
+              />
+              Audience voting
+            </label>
+            <label className="flex items-center gap-2 text-slate-400 text-xs">
+              <input
+                type="checkbox"
                 checked={settings.teamsEnabled}
                 onChange={(e) =>
                   socket.emit("update_settings", {
@@ -247,6 +272,10 @@ export function HostScreen() {
             >
               Close buzz window
             </button>
+          )}
+
+          {settings.audienceVoting && (
+            <AudienceVote tally={voteTally} activeName={votedOnName} />
           )}
 
           {/* Buzz order */}

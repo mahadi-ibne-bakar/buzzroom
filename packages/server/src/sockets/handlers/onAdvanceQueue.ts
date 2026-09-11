@@ -3,6 +3,7 @@ import {
   advanceQueue,
   getActiveEntry,
   toBuzzEntryView,
+  toVoteTally,
 } from "../../rooms/round.js";
 import type { RoomStore } from "../../rooms/RoomStore.js";
 import { getHostRoom } from "../authHelpers.js";
@@ -52,6 +53,9 @@ export function onAdvanceQueue(
         buzzOrder: room.round.buzzOrder.map(toBuzzEntryView),
         activePlayerId: nextActive?.playerId ?? null,
       });
+      // The votes were about the player just eliminated, so everyone needs
+      // the reset tally for whoever is up next.
+      io.to(room.roomId).emit("vote_tally", { tally: toVoteTally(room.round) });
       console.log(
         `[queue] "${result.eliminatedEntry.playerName}" wrong in ${room.roomCode}` +
           (result.nextActiveEntry
@@ -74,6 +78,9 @@ export function onAdvanceQueue(
         winnerName: winnerEntry.playerName,
         pointsAwarded: payload.points,
       });
+
+      // Voting is over for this round.
+      io.to(room.roomId).emit("vote_tally", { tally: toVoteTally(room.round) });
 
       // emitScoreUpdate computes the leaderboard and broadcasts score_update.
       emitScoreUpdate(io, room, store);

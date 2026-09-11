@@ -1,10 +1,12 @@
 import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import type {
+  AudienceVote,
   BuzzMode,
   BuzzEntryView,
   BuzzWindowMode,
   ModeParams,
   RoundView,
+  VoteTally,
 } from "@buzzroom/shared";
 import {
   NEAR_TIE_THRESHOLD_MS,
@@ -45,6 +47,14 @@ export interface Round {
   openedAtServerTime: number;
   buzzOrder: BuzzEntry[];
   lockouts: Map<string, EarlyBuzzLockout>;
+  // Audience votes on whoever is currently called on, keyed by voter so a
+  // player can change their mind but never vote twice.
+  votes: Map<string, AudienceVote>;
+  // Who those votes are about. A vote is about one person's answer, so if the
+  // active player changes the tally has to start over -- and under free buzz
+  // a late buzz with an earlier adjustedTime can take rank 1 and change who
+  // is active without the host doing anything.
+  votesFor: string | null;
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────
@@ -108,6 +118,8 @@ export function createRound(mode: BuzzMode): Round {
     openedAtServerTime: Date.now(),
     buzzOrder: [],
     lockouts: new Map(),
+    votes: new Map(),
+    votesFor: null,
   };
 }
 
@@ -356,8 +368,74 @@ export function advanceQueue(
   }
 
   activeEntry.eliminated = true;
+  // The queue has moved on to a different answer, so the old votes no longer
+  // mean anything.
+  clearVotes(round);
   const nextActiveEntry = getActiveEntry(round);
   return { type: "wrong", eliminatedEntry: activeEntry, nextActiveEntry };
+}
+
+// ── Audience voting ───────────────────────────────────────────────────────
+
+export type VoteResult =
+  | { type: "counted" }
+  | { type: "no_active_player" }
+  | { type: "cannot_vote_on_self" };
+
+function clearVotes(round: Round): void {
+  round.votes.clear();
+  round.votesFor = null;
+}
+
+/** The player the audience can currently vote on, if any. */
+function votablePlayerId(round: Round): string | null {
+  if (round.resolved) return null;
+  return getActiveEntry(round)?.playerId ?? null;
+}
+
+/**
+ * Records an audience vote on whoever is currently called on.
+ *
+ * Keyed by voter, so casting again replaces the previous vote rather than
+ * stacking: changing your mind is fine, voting twice is not.
+ */
+export function castVote(
+  round: Round,
+  voterId: string,
+  vote: AudienceVote,
+): VoteResult {
+  const activeId = votablePlayerId(round);
+  if (activeId === null) return { type: "no_active_player" };
+  if (activeId === voterId) return { type: "cannot_vote_on_self" };
+
+  // Whoever we were tallying for is no longer the one answering, so the
+  // existing votes are about someone else. Start fresh.
+  if (round.votesFor !== activeId) {
+    clearVotes(round);
+    round.votesFor = activeId;
+  }
+
+  round.votes.set(voterId, vote);
+  return { type: "counted" };
+}
+
+export function toVoteTally(round: Round): VoteTally {
+  const activeId = votablePlayerId(round);
+
+  // Votes cast against a different player must not be reported against this
+  // one, even if nothing has cleared them yet.
+  if (activeId === null || round.votesFor !== activeId) {
+    return { activePlayerId: activeId, agree: 0, disagree: 0 };
+  }
+
+  let agree = 0;
+  let disagree = 0;
+  for (const vote of round.votes.values()) {
+    if (vote === "agree") agree++;
+    else disagree++;
+  }
+
+  return { activePlayerId: activeId, agree, disagree };
 }
 
 // ── View conversion ───────────────────────────────────────────────────────

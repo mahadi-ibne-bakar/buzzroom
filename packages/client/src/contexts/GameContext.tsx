@@ -28,6 +28,9 @@ import type {
   SettingsUpdatedPayload,
   TeamLeaderboardEntry,
   TeamsUpdatedPayload,
+  AudienceVote,
+  VoteTally,
+  VoteTallyPayload,
   WatchOkPayload,
 } from "@buzzroom/shared";
 import { useSocket } from "./SocketContext.js";
@@ -58,6 +61,12 @@ export interface GameState {
   // out by the server. Kept out of `room.players` so a ping refresh every
   // couple of seconds doesn't churn the player list.
   pings: Record<string, number | null>;
+  // The audience tally for whoever is currently called on. activePlayerId
+  // null means nobody is being voted on.
+  voteTally: VoteTally;
+  // This viewer's own vote, kept locally: the server broadcasts totals, not
+  // who voted which way, so the highlight has to come from here.
+  myVote: AudienceVote | null;
 }
 
 const initial: GameState = {
@@ -71,6 +80,8 @@ const initial: GameState = {
   roundResult: null,
   lockout: null,
   pings: {},
+  voteTally: { activePlayerId: null, agree: 0, disagree: 0 },
+  myVote: null,
 };
 
 // ── Actions ───────────────────────────────────────────────────────────────
@@ -116,6 +127,8 @@ export type GameAction =
   | { type: "EARLY_BUZZ_PENALTY"; lockedForMs: number; offenseCount: number }
   | { type: "SETTINGS_UPDATED"; settings: RoomSettingsView }
   | { type: "PING_UPDATE"; pings: PingUpdatePayload["pings"] }
+  | { type: "VOTE_TALLY"; tally: VoteTally }
+  | { type: "MY_VOTE"; vote: AudienceVote }
   | { type: "ERROR"; message: string }
   | { type: "CLEAR_ERROR" }
   | { type: "LEAVE" };
@@ -203,6 +216,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         room: { ...state.room, round: action.round },
         roundResult: null,
         lockout: null,
+        voteTally: { activePlayerId: null, agree: 0, disagree: 0 },
+        myVote: null,
       };
 
     case "ROUND_CLOSED":
@@ -221,6 +236,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         room: { ...state.room, round: null },
         roundResult: null,
+        voteTally: { activePlayerId: null, agree: 0, disagree: 0 },
+        myVote: null,
       };
 
     case "BUZZ_ORDER_UPDATED":
@@ -295,6 +312,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           action.pings.map((p) => [p.playerId, p.rttMs]),
         ),
       };
+
+    case "VOTE_TALLY":
+      return {
+        ...state,
+        voteTally: action.tally,
+        // A tally about a different player (or nobody) is a new question, so
+        // this viewer's own choice no longer applies.
+        myVote:
+          action.tally.activePlayerId === state.voteTally.activePlayerId
+            ? state.myVote
+            : null,
+      };
+
+    case "MY_VOTE":
+      return { ...state, myVote: action.vote };
 
     case "ERROR":
       return { ...state, errorMessage: action.message };
@@ -404,6 +436,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "SETTINGS_UPDATED", settings }),
       ping_update: ({ pings }: PingUpdatePayload) =>
         dispatch({ type: "PING_UPDATE", pings }),
+      vote_tally: ({ tally }: VoteTallyPayload) =>
+        dispatch({ type: "VOTE_TALLY", tally }),
       server_error: ({ message }: ServerErrorPayload) =>
         dispatch({ type: "ERROR", message }),
     } as const;

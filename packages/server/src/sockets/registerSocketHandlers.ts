@@ -2,6 +2,7 @@ import {
   AdvanceQueuePayloadSchema,
   AssignTeamPayloadSchema,
   AwardPointsPayloadSchema,
+  CastVotePayloadSchema,
   CreateTeamPayloadSchema,
   DeleteTeamPayloadSchema,
   BuzzPayloadSchema,
@@ -32,6 +33,7 @@ import {
   onCreateTeam,
   onDeleteTeam,
 } from "./handlers/onTeams.js";
+import { onCastVote } from "./handlers/onCastVote.js";
 import { onWatchRoom } from "./handlers/onWatchRoom.js";
 import { SocketRateLimiter } from "./rateLimiter.js";
 
@@ -158,6 +160,15 @@ export function registerSocketHandlers(
       const data = validate(UpdateSettingsPayloadSchema, payload);
       if (!data) return;
       onUpdateSettings(io, socket, store, data);
+    });
+
+    // Voting is cheap and people mash it; the budget is deliberately loose
+    // because changing your mind is a legitimate use.
+    socket.on("cast_vote", (payload) => {
+      if (!rateCheck("cast_vote", 120)) return;
+      const data = validate(CastVotePayloadSchema, payload);
+      if (!data) return;
+      onCastVote(io, socket, store, data);
     });
 
     // ── Teams ─────────────────────────────────────────────────────────────

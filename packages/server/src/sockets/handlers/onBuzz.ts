@@ -6,6 +6,7 @@ import {
   getActiveEntry,
   toBuzzEntryView,
   toRoundView,
+  toVoteTally,
 } from "../../rooms/round.js";
 import type { RoomStore } from "../../rooms/RoomStore.js";
 import type { TypedServer, TypedSocket } from "../../socketTypes.js";
@@ -96,6 +97,17 @@ export function onBuzz(
         buzzOrder: room.round.buzzOrder.map(toBuzzEntryView),
         activePlayerId: activeEntry?.playerId ?? null,
       });
+
+      // This buzz may have put someone new at the front -- the first buzz of
+      // the round always does, and under free buzz a late one with an earlier
+      // adjustedTime can too. Clients gate the vote panel on the tally naming
+      // someone, so without this nobody could ever vote: the panel would wait
+      // for a tally that only a vote would produce.
+      if (room.settings.audienceVoting) {
+        io.to(room.roomId).emit("vote_tally", {
+          tally: toVoteTally(room.round),
+        });
+      }
       console.log(
         `[buzz] "${player.name}" rank ${result.entry.rank} ` +
           `adjustedTime=${result.entry.adjustedTime} ` +

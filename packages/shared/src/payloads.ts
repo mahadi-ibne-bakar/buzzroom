@@ -70,6 +70,11 @@ export const AwardPointsPayloadSchema = z.object({
 });
 export type AwardPointsPayload = z.infer<typeof AwardPointsPayloadSchema>;
 
+export const CastVotePayloadSchema = z.object({
+  vote: z.enum(["agree", "disagree"]),
+});
+export type CastVotePayload = z.infer<typeof CastVotePayloadSchema>;
+
 export const CreateTeamPayloadSchema = z.object({
   name: z.string().min(1).max(20),
 });
@@ -113,6 +118,7 @@ export const UpdateSettingsPayloadSchema = z
     buzzWindowMode: z.enum(["free", "locked"]).optional(),
     earlyBuzzPenalty: z.boolean().optional(),
     teamsEnabled: z.boolean().optional(),
+    audienceVoting: z.boolean().optional(),
   })
   .refine((p) => Object.values(p).some((v) => v !== undefined), {
     message: "at least one setting must be provided",
