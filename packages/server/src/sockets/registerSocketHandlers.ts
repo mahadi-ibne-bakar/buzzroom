@@ -8,6 +8,7 @@ import {
   ReconnectRoomPayloadSchema,
   SyncPingPayloadSchema,
   UpdateSettingsPayloadSchema,
+  WatchRoomPayloadSchema,
 } from "@buzzroom/shared";
 import type { RoomStore } from "../rooms/RoomStore.js";
 import type { TypedServer } from "../socketTypes.js";
@@ -23,6 +24,7 @@ import { onReconnect } from "./handlers/onReconnect.js";
 import { onResetRound } from "./handlers/onResetRound.js";
 import { onSyncPing } from "./handlers/onSyncPing.js";
 import { onUpdateSettings } from "./handlers/onUpdateSettings.js";
+import { onWatchRoom } from "./handlers/onWatchRoom.js";
 import { SocketRateLimiter } from "./rateLimiter.js";
 
 export function registerSocketHandlers(
@@ -80,6 +82,14 @@ export function registerSocketHandlers(
       const data = validate(JoinRoomPayloadSchema, payload);
       if (!data) return;
       onJoinRoom(io, socket, store, data);
+    });
+
+    // A presenter screen attaches as a read-only observer.
+    socket.on("watch_room", (payload) => {
+      if (!rateCheck("watch_room", 10)) return;
+      const data = validate(WatchRoomPayloadSchema, payload);
+      if (!data) return;
+      onWatchRoom(io, socket, store, data);
     });
 
     // Reconnects are more frequent than joins -- a flaky phone can drop and

@@ -8,6 +8,7 @@ import type {
   ReconnectRoomPayload,
   SyncPingPayload,
   UpdateSettingsPayload,
+  WatchRoomPayload,
 } from "./payloads.js";
 import type {
   BuzzEntryView,
@@ -64,6 +65,10 @@ export interface SettingsUpdatedPayload {
 export interface PingUpdatePayload {
   pings: { playerId: string; rttMs: number | null }[];
 }
+export interface WatchOkPayload {
+  room: RoomView;
+  leaderboard: LeaderboardEntry[];
+}
 export interface ReconnectOkPayload {
   room: RoomView;
   yourPlayerId: string;
@@ -107,6 +112,7 @@ export interface ServerToClientEvents {
   ping_update: (p: PingUpdatePayload) => void;
   host_left: () => void;
   reconnect_ok: (p: ReconnectOkPayload) => void;
+  watch_ok: (p: WatchOkPayload) => void;
   server_error: (p: ServerErrorPayload) => void;
 }
 
@@ -122,4 +128,5 @@ export interface ClientToServerEvents {
   award_points: (p: AwardPointsPayload) => void;
   reconnect_room: (p: ReconnectRoomPayload) => void;
   update_settings: (p: UpdateSettingsPayload) => void;
+  watch_room: (p: WatchRoomPayload) => void;
 }

@@ -10,6 +10,7 @@ import type {
   ServerErrorPayload,
   SettingsUpdatedPayload,
   SyncPongPayload,
+  WatchOkPayload,
 } from "@buzzroom/shared";
 import { createServer } from "../createServer.js";
 
@@ -292,5 +293,79 @@ describe("ping_update", () => {
 
     const { room } = await joinPlayer(roomCode, "Bob");
     expect(room.players.find((p) => p.playerId === playerId)!.rttMs).toBe(17);
+  });
+});
+
+// ── presenter view ────────────────────────────────────────────────────────
+
+describe("watch_room", () => {
+  it("sends a full snapshot including the current leaderboard", async () => {
+    // score_update only fires when a score changes, so a presenter attaching
+    // mid-game has to get the board in the watch_ok itself.
+    const { host, roomCode } = await openRoom();
+    const { playerId } = await joinPlayer(roomCode, "Alice");
+    const scored = waitForEvent<SettingsUpdatedPayload>(host, "score_update");
+    host.emit("award_points", { playerId, delta: 4 });
+    await scored;
+
+    const presenter = await makeClient();
+    const ok = waitForEvent<WatchOkPayload>(presenter, "watch_ok");
+    presenter.emit("watch_room", { roomCode });
+
+    const { room, leaderboard } = await ok;
+    expect(room.roomCode).toBe(roomCode);
+    expect(leaderboard.find((e) => e.playerId === playerId)!.score).toBe(4);
+  });
+
+  it("takes no seat in the room", async () => {
+    const { roomCode } = await openRoom();
+
+    const presenter = await makeClient();
+    const ok = waitForEvent<WatchOkPayload>(presenter, "watch_ok");
+    presenter.emit("watch_room", { roomCode });
+    await ok;
+
+    // Only the host. A presenter must not consume a player slot or show up
+    // on the leaderboard.
+    const { room } = await joinPlayer(roomCode, "Alice");
+    expect(room.players).toHaveLength(2);
+  });
+
+  it("receives the room's live broadcasts", async () => {
+    const { host, roomCode } = await openRoom();
+    const presenter = await makeClient();
+    const ok = waitForEvent<WatchOkPayload>(presenter, "watch_ok");
+    presenter.emit("watch_room", { roomCode });
+    await ok;
+
+    const opened = waitForEvent<RoundOpenedPayload>(presenter, "round_opened");
+    host.emit("open_buzz", { buzzMode: "button" });
+
+    expect((await opened).round.status).toBe("open");
+  });
+
+  it("does not announce a player_left when it disconnects", async () => {
+    const { host, roomCode } = await openRoom();
+    const presenter = await makeClient();
+    const ok = waitForEvent<WatchOkPayload>(presenter, "watch_ok");
+    presenter.emit("watch_room", { roomCode });
+    await ok;
+
+    let sawLeft = false;
+    host.on("player_left", () => {
+      sawLeft = true;
+    });
+    presenter.close();
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(sawLeft).toBe(false);
+  });
+
+  it("rejects an unknown room code", async () => {
+    const presenter = await makeClient();
+    const err = waitForEvent<ServerErrorPayload>(presenter, "server_error");
+    presenter.emit("watch_room", { roomCode: "ZZZZZZ" });
+
+    expect((await err).code).toBe("ROOM_NOT_FOUND");
   });
 });

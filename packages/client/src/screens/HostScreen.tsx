@@ -104,8 +104,16 @@ export function HostScreen() {
             ))}
           </div>
 
-          <div className="mt-4 flex justify-center">
+          <div className="mt-4 flex flex-col items-center gap-3">
             <JoinQrCode roomCode={room.roomCode} />
+            <a
+              href={`/?present=${room.roomCode}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 text-xs underline"
+            >
+              Open presenter view ↗
+            </a>
           </div>
         </div>
       )}

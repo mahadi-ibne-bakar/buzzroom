@@ -26,13 +26,15 @@ import type {
   ScoreUpdatePayload,
   ServerErrorPayload,
   SettingsUpdatedPayload,
+  WatchOkPayload,
 } from "@buzzroom/shared";
 import { useSocket } from "./SocketContext.js";
+import { parsePresentCodeFromSearch } from "../lib/joinLink.js";
 
 // ── State ─────────────────────────────────────────────────────────────────
 
 export interface GameState {
-  screen: "landing" | "host" | "player";
+  screen: "landing" | "host" | "player" | "presenter";
   room: RoomView | null;
   myPlayerId: string | null;
   leaderboard: LeaderboardEntry[];
@@ -71,6 +73,7 @@ export type GameAction =
   | { type: "ROOM_CREATED"; room: RoomView; myPlayerId: string }
   | { type: "JOINED"; room: RoomView; myPlayerId: string }
   | { type: "RECONNECTED"; room: RoomView; myPlayerId: string }
+  | { type: "WATCHING"; room: RoomView; leaderboard: LeaderboardEntry[] }
   | { type: "PLAYER_JOINED"; player: PlayerView }
   | { type: "PLAYER_LEFT"; playerId: string }
   | { type: "HOST_LEFT" }
@@ -127,6 +130,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         hostGone: false,
       };
     }
+
+    // A presenter has no seat in the room, so no myPlayerId: every "is this
+    // me?" check in the shared components correctly answers no.
+    case "WATCHING":
+      return {
+        ...state,
+        screen: "presenter",
+        room: action.room,
+        myPlayerId: null,
+        leaderboard: action.leaderboard,
+        errorMessage: null,
+      };
 
     case "PLAYER_JOINED": {
       if (!state.room) return state;
@@ -302,6 +317,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         saveSession(yourPlayerId, room.roomCode);
         dispatch({ type: "JOINED", room, myPlayerId: yourPlayerId });
       },
+      watch_ok: ({ room, leaderboard }: WatchOkPayload) =>
+        dispatch({ type: "WATCHING", room, leaderboard }),
       reconnect_ok: ({ room, yourPlayerId }: ReconnectOkPayload) => {
         saveSession(yourPlayerId, room.roomCode);
         dispatch({ type: "RECONNECTED", room, myPlayerId: yourPlayerId });
@@ -360,32 +377,42 @@ export function GameProvider({ children }: { children: ReactNode }) {
     };
   }, [socket]);
 
-  // On mount, attempt to rejoin whatever room this tab was last in.
+  // On mount, re-attach to whatever this tab was doing: watching as a
+  // presenter, or rejoining the room it last held a seat in.
   useEffect(() => {
-    const raw = sessionStorage.getItem("buzzroom-session");
-    if (!raw) return;
+    const presentCode = parsePresentCodeFromSearch(window.location.search);
 
-    let session: { playerId: string; roomCode: string };
-    try {
-      session = JSON.parse(raw) as { playerId: string; roomCode: string };
-    } catch {
-      sessionStorage.removeItem("buzzroom-session");
-      return;
+    // Re-emitted on every reconnect, not just the first connect: socket.io
+    // restores the transport on its own after a network blip, and the server
+    // has no memory of what the new socket was doing.
+    let reattach: (() => void) | null = null;
+
+    if (presentCode) {
+      reattach = () => socket.emit("watch_room", { roomCode: presentCode });
+    } else {
+      const raw = sessionStorage.getItem("buzzroom-session");
+      if (raw) {
+        try {
+          const session = JSON.parse(raw) as {
+            playerId: string;
+            roomCode: string;
+          };
+          reattach = () => socket.emit("reconnect_room", session);
+        } catch {
+          sessionStorage.removeItem("buzzroom-session");
+        }
+      }
     }
 
-    const rejoin = () => {
-      socket.emit("reconnect_room", session);
-    };
+    if (!reattach) return;
+    const run = reattach;
 
-    // Re-emit on every reconnect, not just the first connect: socket.io
-    // restores the transport on its own after a network blip, and the server
-    // has no memory of which room the new socket belongs to.
-    socket.on("connect", rejoin);
-    if (socket.connected) rejoin();
+    socket.on("connect", run);
+    if (socket.connected) run();
     else socket.connect();
 
     return () => {
-      socket.off("connect", rejoin);
+      socket.off("connect", run);
     };
   }, [socket]);
 

@@ -3,6 +3,7 @@ import { GameProvider, useGame } from "./contexts/GameContext.js";
 import { LandingScreen } from "./screens/LandingScreen.js";
 import { HostScreen } from "./screens/HostScreen.js";
 import { PlayerScreen } from "./screens/PlayerScreen.js";
+import { PresenterScreen } from "./screens/PresenterScreen.js";
 
 function AppShell() {
   const { state, dispatch } = useGame();
@@ -38,6 +39,7 @@ function AppShell() {
       {state.screen === "landing" && <LandingScreen />}
       {state.screen === "host" && <HostScreen />}
       {state.screen === "player" && <PlayerScreen />}
+      {state.screen === "presenter" && <PresenterScreen />}
     </div>
   );
 }

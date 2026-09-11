@@ -70,6 +70,16 @@ export const AwardPointsPayloadSchema = z.object({
 });
 export type AwardPointsPayload = z.infer<typeof AwardPointsPayloadSchema>;
 
+// A presenter screen watches a room without taking a seat in it: no name, no
+// player record, no place in the leaderboard.
+export const WatchRoomPayloadSchema = z.object({
+  roomCode: z
+    .string()
+    .length(6)
+    .transform((s) => s.toUpperCase()),
+});
+export type WatchRoomPayload = z.infer<typeof WatchRoomPayloadSchema>;
+
 export const ReconnectRoomPayloadSchema = z.object({
   playerId: z.string().uuid(),
   roomCode: z
