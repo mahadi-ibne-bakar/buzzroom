@@ -87,9 +87,9 @@ export function PatternBuzzer({
                   completed
                     ? "bg-green-600 text-white"
                     : isTapped
-                      ? "bg-indigo-600 text-white scale-95"
+                      ? "bg-accent-600 text-white scale-95"
                       : isNext && !failed
-                        ? "bg-indigo-900 text-indigo-300 ring-2 ring-indigo-400 animate-pulse"
+                        ? "bg-accent-900 text-accent-300 ring-2 ring-accent-400 animate-pulse"
                         : step !== null
                           ? "bg-slate-700 text-slate-300 cursor-pointer hover:bg-slate-600"
                           : "bg-slate-700 text-slate-600 cursor-not-allowed opacity-30"

@@ -5,6 +5,7 @@ import { AudienceVote } from "../components/AudienceVote.js";
 import { BuzzOrder } from "../components/BuzzOrder.js";
 import { Leaderboard } from "../components/Leaderboard.js";
 import { PingIndicator } from "../components/PingIndicator.js";
+import { SoundToggle } from "../components/SoundToggle.js";
 import { TeamLeaderboard } from "../components/TeamLeaderboard.js";
 import { ButtonBuzzer } from "../components/buzz/ButtonBuzzer.js";
 import { SlideBuzzer } from "../components/buzz/SlideBuzzer.js";
@@ -12,6 +13,7 @@ import { PatternBuzzer } from "../components/buzz/PatternBuzzer.js";
 import { useEffect, useState } from "react";
 import type { ModeParams } from "@buzzroom/shared";
 import { buildBuzzPayload } from "../lib/buildBuzzPayload.js";
+import { playBuzz } from "../lib/sound.js";
 
 /**
  * Counts an early-buzz lockout down to zero, re-rendering roughly ten times a
@@ -81,6 +83,10 @@ export function PlayerScreen() {
     // opens a plain button round on the first buzz, because there were no
     // gesture parameters to broadcast in advance.
     const modeParams: ModeParams = round?.modeParams ?? { mode: "button" };
+    // Played locally rather than off the server's acknowledgement: the point
+    // of the cue is that the press registered, and waiting a round trip to
+    // say so defeats it.
+    playBuzz();
     socket.emit(
       "buzz",
       buildBuzzPayload(modeParams, localTime, offsetRef.current),
@@ -108,6 +114,7 @@ export function PlayerScreen() {
             <div className="text-slate-400 text-xs">Score</div>
             <div className="text-white font-bold">{myPlayer?.score ?? 0}</div>
           </div>
+          <SoundToggle />
           <button
             onClick={() => dispatch({ type: "LEAVE" })}
             className="text-slate-500 hover:text-slate-300 text-xs"

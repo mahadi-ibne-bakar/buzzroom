@@ -116,6 +116,7 @@ export type {
   TeamLeaderboardEntry,
   AudienceVote,
   VoteTally,
+  Accent,
 } from "./types.js";
 
 export interface ServerToClientEvents {

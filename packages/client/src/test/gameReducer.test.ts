@@ -35,6 +35,8 @@ function makeSettings(
     earlyBuzzPenalty: true,
     teamsEnabled: false,
     audienceVoting: false,
+    accent: "indigo",
+    title: "",
     ...overrides,
   };
 }

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type {
+  Accent,
   BuzzWindowMode,
   PlayerView,
   RoomSettingsView,
@@ -20,6 +21,8 @@ export interface RoomSettings {
   earlyBuzzPenalty: boolean; // default on; penalises buzzing during closed rounds
   teamsEnabled: boolean; // default off; ranks teams instead of individuals
   audienceVoting: boolean; // default off; advisory agree/disagree tally
+  accent: Accent; // cosmetic; drives the client's accent colour
+  title: string; // optional branding shown on the presenter screen
 }
 
 export interface Team {
@@ -107,6 +110,8 @@ export class RoomStore {
         earlyBuzzPenalty: true,
         teamsEnabled: false,
         audienceVoting: false,
+        accent: "indigo",
+        title: "",
       },
       round: null,
       createdAt: Date.now(),
@@ -319,6 +324,8 @@ export class RoomStore {
       earlyBuzzPenalty: room.settings.earlyBuzzPenalty,
       teamsEnabled: room.settings.teamsEnabled,
       audienceVoting: room.settings.audienceVoting,
+      accent: room.settings.accent,
+      title: room.settings.title,
     };
   }
 
@@ -393,6 +400,12 @@ export class RoomStore {
     }
     if (patch.audienceVoting !== undefined) {
       room.settings.audienceVoting = patch.audienceVoting;
+    }
+    if (patch.accent !== undefined) {
+      room.settings.accent = patch.accent;
+    }
+    if (patch.title !== undefined) {
+      room.settings.title = patch.title.trim();
     }
     room.lastActivityAt = Date.now();
     return room.settings;

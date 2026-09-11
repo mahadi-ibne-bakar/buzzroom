@@ -34,7 +34,7 @@ export function PresenterScreen() {
       <div className="flex items-start justify-between gap-8">
         <div>
           <div className="text-slate-500 text-xl uppercase tracking-[0.3em]">
-            Join at
+            {room.settings.title || "Join at"}
           </div>
           <div className="text-7xl font-bold tracking-[0.2em] text-white mt-1">
             {room.roomCode}
@@ -42,7 +42,7 @@ export function PresenterScreen() {
           <div className="text-slate-400 text-xl mt-3">
             {connected.length} player{connected.length !== 1 ? "s" : ""} in
             {room.settings.buzzWindowMode === "free" && (
-              <span className="text-indigo-400"> · ⚡ free buzz</span>
+              <span className="text-accent-400"> · ⚡ free buzz</span>
             )}
           </div>
         </div>
@@ -113,7 +113,7 @@ export function PresenterScreen() {
                         entry.eliminated
                           ? "bg-slate-800/50 opacity-40 line-through"
                           : isActive
-                            ? "bg-indigo-700 ring-4 ring-indigo-400"
+                            ? "bg-accent-700 ring-4 ring-accent-400"
                             : "bg-slate-800"
                       }`}
                     >

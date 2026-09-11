@@ -46,12 +46,12 @@ export function TeamManager({
           onKeyDown={(e) => e.key === "Enter" && create()}
           placeholder="New team name"
           maxLength={20}
-          className="flex-1 bg-slate-700 text-white rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          className="flex-1 bg-slate-700 text-white rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent-500"
         />
         <button
           onClick={create}
           disabled={!newName.trim()}
-          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-semibold text-sm"
+          className="px-4 py-2 rounded-xl bg-accent-600 hover:bg-accent-500 disabled:opacity-40 text-white font-semibold text-sm"
         >
           Add
         </button>

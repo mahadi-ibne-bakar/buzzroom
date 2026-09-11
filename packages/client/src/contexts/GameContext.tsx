@@ -35,6 +35,7 @@ import type {
 } from "@buzzroom/shared";
 import { useSocket } from "./SocketContext.js";
 import { parsePresentCodeFromSearch } from "../lib/joinLink.js";
+import { playCorrect, playPenalty, playRoundOpen } from "../lib/sound.js";
 
 // ── State ─────────────────────────────────────────────────────────────────
 
@@ -390,8 +391,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       player_left: ({ playerId }: PlayerLeftPayload) =>
         dispatch({ type: "PLAYER_LEFT", playerId }),
       host_left: () => dispatch({ type: "HOST_LEFT" }),
-      round_opened: ({ round }: RoundOpenedPayload) =>
-        dispatch({ type: "ROUND_OPENED", round }),
+      round_opened: ({ round }: RoundOpenedPayload) => {
+        playRoundOpen();
+        dispatch({ type: "ROUND_OPENED", round });
+      },
       round_closed: () => dispatch({ type: "ROUND_CLOSED" }),
       round_reset: () => dispatch({ type: "ROUND_RESET" }),
       buzz_order_updated: ({
@@ -416,13 +419,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
         winnerPlayerId,
         winnerName,
         pointsAwarded,
-      }: RoundResolvedPayload) =>
+      }: RoundResolvedPayload) => {
+        playCorrect();
         dispatch({
           type: "ROUND_RESOLVED",
           winnerPlayerId,
           winnerName,
           pointsAwarded,
-        }),
+        });
+      },
       early_buzz_penalty: ({
         lockedForMs,
         offenseCount,
@@ -430,6 +435,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         // Spec §5 asks for a haptic nudge alongside the cooldown. Not every
         // browser implements it, hence the guard.
         navigator.vibrate?.(200);
+        playPenalty();
         dispatch({ type: "EARLY_BUZZ_PENALTY", lockedForMs, offenseCount });
       },
       settings_updated: ({ settings }: SettingsUpdatedPayload) =>

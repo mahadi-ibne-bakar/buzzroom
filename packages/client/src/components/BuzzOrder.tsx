@@ -34,7 +34,7 @@ export function BuzzOrder({
               entry.eliminated
                 ? "bg-slate-800 opacity-40 line-through"
                 : isActive
-                  ? "bg-indigo-700 ring-2 ring-indigo-400"
+                  ? "bg-accent-700 ring-2 ring-accent-400"
                   : "bg-slate-800"
             }`}
           >
@@ -43,7 +43,7 @@ export function BuzzOrder({
             </span>
 
             <span
-              className={`flex-1 font-semibold ${isMe ? "text-indigo-300" : "text-white"}`}
+              className={`flex-1 font-semibold ${isMe ? "text-accent-300" : "text-white"}`}
             >
               {entry.playerName}
               {isMe && " (you)"}

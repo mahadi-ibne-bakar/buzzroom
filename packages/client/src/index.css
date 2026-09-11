@@ -1,5 +1,69 @@
 @import "tailwindcss";
 
+/* ── Accent theming ───────────────────────────────────────────────────────
+   The accent is a room setting, so every screen in a game recolours
+   together. @theme declares the default (indigo) palette, which is what
+   bg-accent-600 and friends resolve against; a [data-accent] block on <html>
+   overrides those same variables directly.
+
+   Overriding --color-accent-* rather than pointing them at a second layer of
+   custom properties is deliberate. With the extra indirection the values
+   updated correctly but the browser did not repaint elements referencing
+   them until something else forced a style recalc, so switching accent did
+   nothing visible until the next layout change. One lookup, no chain.
+
+   These rules sit outside @layer on purpose: unlayered declarations beat
+   layered ones, so they win over Tailwind's own theme layer regardless of
+   selector specificity. */
+
+@theme {
+  --color-accent-300: #a5b4fc;
+  --color-accent-400: #818cf8;
+  --color-accent-500: #6366f1;
+  --color-accent-600: #4f46e5;
+  --color-accent-700: #4338ca;
+  --color-accent-900: #312e81;
+}
+
+[data-accent="emerald"] {
+  --color-accent-300: #6ee7b7;
+  --color-accent-400: #34d399;
+  --color-accent-500: #10b981;
+  --color-accent-600: #059669;
+  --color-accent-700: #047857;
+  --color-accent-900: #064e3b;
+}
+
+[data-accent="rose"] {
+  --color-accent-300: #fda4af;
+  --color-accent-400: #fb7185;
+  --color-accent-500: #f43f5e;
+  --color-accent-600: #e11d48;
+  --color-accent-700: #be123c;
+  --color-accent-900: #881337;
+}
+
+[data-accent="amber"] {
+  --color-accent-300: #fcd34d;
+  --color-accent-400: #fbbf24;
+  --color-accent-500: #f59e0b;
+  --color-accent-600: #d97706;
+  --color-accent-700: #b45309;
+  --color-accent-900: #78350f;
+}
+
+/* Colour transitions never fire when the new colour arrives via a changed
+   custom property -- the element just keeps painting the old value until
+   something else forces a recalc. Dropping transitions for the duration of
+   an accent swap sidesteps that, and makes the recolour instant rather than
+   a staggered fade. See the effect in App.tsx that toggles this. */
+.accent-switching,
+.accent-switching *,
+.accent-switching *::before,
+.accent-switching *::after {
+  transition: none !important;
+}
+
 /* ── Global resets ───────────────────────────────────────────────────────── */
 *,
 *::before,

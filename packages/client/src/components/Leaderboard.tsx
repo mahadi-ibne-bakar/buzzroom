@@ -21,14 +21,14 @@ export function Leaderboard({ entries, myPlayerId, pings }: Props) {
         <li
           key={entry.playerId}
           className={`flex items-center gap-3 px-4 py-2 rounded-xl ${
-            entry.playerId === myPlayerId ? "bg-indigo-900" : "bg-slate-800"
+            entry.playerId === myPlayerId ? "bg-accent-900" : "bg-slate-800"
           } ${!entry.isConnected ? "opacity-50" : ""}`}
         >
           <span className="text-slate-400 font-bold w-6 text-sm">
             {entry.isTied ? `=${entry.rank}` : `${entry.rank}`}
           </span>
           <span
-            className={`flex-1 text-sm font-medium ${entry.playerId === myPlayerId ? "text-indigo-300" : "text-white"}`}
+            className={`flex-1 text-sm font-medium ${entry.playerId === myPlayerId ? "text-accent-300" : "text-white"}`}
           >
             {entry.name}
             {!entry.isConnected && " 📵"}

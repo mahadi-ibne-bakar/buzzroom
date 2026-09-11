@@ -50,7 +50,7 @@ export function LandingScreen() {
         <div className="flex flex-col gap-3 w-full max-w-xs">
           <button
             onClick={() => setMode("host")}
-            className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-lg transition-colors"
+            className="w-full py-4 rounded-2xl bg-accent-600 hover:bg-accent-500 active:bg-accent-700 text-white font-semibold text-lg transition-colors"
           >
             Host a game
           </button>
@@ -86,7 +86,7 @@ export function LandingScreen() {
         <div>
           <label className="block text-slate-400 text-sm mb-1">Your name</label>
           <input
-            className="w-full bg-slate-800 text-white rounded-xl px-4 py-3 text-lg outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full bg-slate-800 text-white rounded-xl px-4 py-3 text-lg outline-none focus:ring-2 focus:ring-accent-500"
             placeholder="Enter your name"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -101,7 +101,7 @@ export function LandingScreen() {
               Room code
             </label>
             <input
-              className="w-full bg-slate-800 text-white rounded-xl px-4 py-3 text-lg tracking-widest uppercase outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-slate-800 text-white rounded-xl px-4 py-3 text-lg tracking-widest uppercase outline-none focus:ring-2 focus:ring-accent-500"
               placeholder="6-letter code"
               value={code}
               onChange={(e) =>
@@ -115,7 +115,7 @@ export function LandingScreen() {
         <button
           onClick={isHost ? handleHost : handleJoin}
           disabled={busy || !name.trim() || (!isHost && code.length !== 6)}
-          className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-lg transition-colors"
+          className="w-full py-4 rounded-2xl bg-accent-600 hover:bg-accent-500 active:bg-accent-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-lg transition-colors"
         >
           {busy ? "Connecting…" : isHost ? "Create room" : "Join room"}
         </button>

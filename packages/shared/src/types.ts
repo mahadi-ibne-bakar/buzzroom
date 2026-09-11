@@ -27,6 +27,10 @@ export interface PlayerView {
  */
 export type BuzzWindowMode = "free" | "locked";
 
+/** Room accent colour. Purely cosmetic; drives the CSS accent variables. */
+export const ACCENTS = ["indigo", "emerald", "rose", "amber"] as const;
+export type Accent = (typeof ACCENTS)[number];
+
 export type AudienceVote = "agree" | "disagree";
 
 export interface VoteTally {
@@ -43,6 +47,10 @@ export interface RoomSettingsView {
   // agree/disagree while the host decides. Advisory only -- it never changes
   // a score.
   audienceVoting: boolean;
+  accent: Accent;
+  // Shown instead of "BuzzRoom" on the presenter screen. Empty means no
+  // branding, and the room falls back to the default wording.
+  title: string;
   // When on, the leaderboard ranks teams instead of individuals. Player
   // scores still exist underneath -- a team's score is the sum of its
   // members' -- so switching modes never loses anything.

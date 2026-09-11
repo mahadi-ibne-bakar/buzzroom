@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { SocketProvider, useSocket } from "./contexts/SocketContext.js";
 import { GameProvider, useGame } from "./contexts/GameContext.js";
 import { LandingScreen } from "./screens/LandingScreen.js";
@@ -8,6 +9,25 @@ import { PresenterScreen } from "./screens/PresenterScreen.js";
 function AppShell() {
   const { state, dispatch } = useGame();
   const { connected } = useSocket();
+
+  // The accent is a room setting, so every screen in a game recolours
+  // together. Set on <html> rather than a wrapper so it also reaches the
+  // page background painted outside the React tree.
+  const accent = state.room?.settings.accent ?? "indigo";
+  useEffect(() => {
+    const root = document.documentElement;
+    // Transitions are suppressed across the swap: a colour transition does
+    // not fire when the new colour arrives through a changed custom
+    // property, so transitioned elements keep painting the previous accent
+    // until some unrelated recalc knocks them loose. Restored on the next
+    // frame, once the new colour has been painted.
+    root.classList.add("accent-switching");
+    root.dataset.accent = accent;
+    const frame = requestAnimationFrame(() =>
+      root.classList.remove("accent-switching"),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [accent]);
 
   return (
     <div className="min-h-screen flex flex-col">

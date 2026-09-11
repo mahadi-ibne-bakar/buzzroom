@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { BuzzMode, BuzzWindowMode } from "@buzzroom/shared";
+import { ACCENTS, type BuzzMode, type BuzzWindowMode } from "@buzzroom/shared";
 import { useGame } from "../contexts/GameContext.js";
 import { useSocket } from "../contexts/SocketContext.js";
 import { useClockSync } from "../hooks/useClockSync.js";
@@ -8,6 +8,7 @@ import { BuzzOrder } from "../components/BuzzOrder.js";
 import { JoinQrCode } from "../components/JoinQrCode.js";
 import { Leaderboard } from "../components/Leaderboard.js";
 import { PingIndicator } from "../components/PingIndicator.js";
+import { SoundToggle } from "../components/SoundToggle.js";
 import { TeamLeaderboard } from "../components/TeamLeaderboard.js";
 import { TeamManager } from "../components/TeamManager.js";
 
@@ -92,12 +93,15 @@ export function HostScreen() {
             {connectedPlayers.length} player
             {connectedPlayers.length !== 1 ? "s" : ""}
           </div>
-          <button
-            onClick={() => dispatch({ type: "LEAVE" })}
-            className="text-slate-500 hover:text-slate-300 text-xs mt-1"
-          >
-            End game
-          </button>
+          <div className="flex items-center justify-end gap-2 mt-1">
+            <SoundToggle />
+            <button
+              onClick={() => dispatch({ type: "LEAVE" })}
+              className="text-slate-500 hover:text-slate-300 text-xs"
+            >
+              End game
+            </button>
+          </div>
         </div>
       </div>
 
@@ -125,7 +129,7 @@ export function HostScreen() {
               href={`/?present=${room.roomCode}`}
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-400 hover:text-indigo-300 text-xs underline"
+              className="text-accent-400 hover:text-accent-300 text-xs underline"
             >
               Open presenter view ↗
             </a>
@@ -190,6 +194,36 @@ export function HostScreen() {
                 ? "Buzzes only count while the window is open. Buzzing early earns a short lockout."
                 : "Players can buzz any time, before you open the round or after you close it. No early-buzz penalty."}
             </p>
+            {/* Branding: shown instead of "Join at" on the presenter screen */}
+            <input
+              value={settings.title}
+              onChange={(e) =>
+                socket.emit("update_settings", { title: e.target.value })
+              }
+              placeholder="Room title (shown on the big screen)"
+              maxLength={40}
+              className="w-full bg-slate-900 text-white rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-accent-500"
+            />
+
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 text-xs">Colour</span>
+              {ACCENTS.map((a) => (
+                <button
+                  key={a}
+                  onClick={() => socket.emit("update_settings", { accent: a })}
+                  title={a}
+                  aria-label={`${a} accent`}
+                  aria-pressed={settings.accent === a}
+                  data-accent={a}
+                  className={`w-5 h-5 rounded-full bg-accent-500 transition-transform ${
+                    settings.accent === a
+                      ? "ring-2 ring-white scale-110"
+                      : "opacity-60 hover:opacity-100"
+                  }`}
+                />
+              ))}
+            </div>
+
             <label className="flex items-center gap-2 text-slate-400 text-xs">
               <input
                 type="checkbox"
@@ -199,7 +233,7 @@ export function HostScreen() {
                     audienceVoting: e.target.checked,
                   })
                 }
-                className="accent-indigo-500"
+                className="accent-accent-500"
               />
               Audience voting
             </label>
@@ -212,7 +246,7 @@ export function HostScreen() {
                     teamsEnabled: e.target.checked,
                   })
                 }
-                className="accent-indigo-500"
+                className="accent-accent-500"
               />
               Team mode
             </label>
@@ -226,7 +260,7 @@ export function HostScreen() {
                     earlyBuzzPenalty: e.target.checked,
                   })
                 }
-                className="accent-indigo-500 disabled:opacity-40"
+                className="accent-accent-500 disabled:opacity-40"
               />
               <span
                 className={
@@ -248,7 +282,7 @@ export function HostScreen() {
                     onClick={() => setSelectedMode(m)}
                     className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
                       selectedMode === m
-                        ? "bg-indigo-600 text-white"
+                        ? "bg-accent-600 text-white"
                         : "bg-slate-800 text-slate-400 hover:text-white"
                     }`}
                   >
@@ -258,7 +292,7 @@ export function HostScreen() {
               </div>
               <button
                 onClick={openBuzz}
-                className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-lg transition-colors"
+                className="w-full py-4 rounded-2xl bg-accent-600 hover:bg-accent-500 active:bg-accent-700 text-white font-bold text-lg transition-colors"
               >
                 Open buzz
               </button>
@@ -285,7 +319,7 @@ export function HostScreen() {
                 <div className="text-slate-400 text-xs uppercase tracking-wider">
                   Buzz order
                   {round.modeParams.mode !== "button" && (
-                    <span className="ml-2 text-indigo-400">
+                    <span className="ml-2 text-accent-400">
                       {MODE_LABELS[round.modeParams.mode]}
                     </span>
                   )}
@@ -376,7 +410,7 @@ export function HostScreen() {
               />
               <button
                 onClick={awardPoints}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm"
+                className="px-4 py-2 rounded-xl bg-accent-600 hover:bg-accent-500 text-white font-semibold text-sm"
               >
                 Award
               </button>

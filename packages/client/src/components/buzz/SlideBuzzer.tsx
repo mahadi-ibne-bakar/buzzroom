@@ -101,7 +101,7 @@ export function SlideBuzzer({
         {/* Fill */}
         <div
           className={`absolute inset-y-0 left-0 rounded-full transition-none ${
-            completed ? "bg-green-500" : "bg-indigo-600"
+            completed ? "bg-green-500" : "bg-accent-600"
           }`}
           style={{ width: completed ? "100%" : `${progress * 100}%` }}
         />
@@ -115,7 +115,7 @@ export function SlideBuzzer({
                 ? "bg-red-700 cursor-not-allowed"
                 : disabled
                   ? "bg-slate-500 cursor-not-allowed"
-                  : "bg-indigo-400 cursor-grab active:cursor-grabbing"
+                  : "bg-accent-400 cursor-grab active:cursor-grabbing"
           }`}
           style={{
             left: completed

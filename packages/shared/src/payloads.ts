@@ -119,6 +119,8 @@ export const UpdateSettingsPayloadSchema = z
     earlyBuzzPenalty: z.boolean().optional(),
     teamsEnabled: z.boolean().optional(),
     audienceVoting: z.boolean().optional(),
+    accent: z.enum(["indigo", "emerald", "rose", "amber"]).optional(),
+    title: z.string().max(40).optional(),
   })
   .refine((p) => Object.values(p).some((v) => v !== undefined), {
     message: "at least one setting must be provided",

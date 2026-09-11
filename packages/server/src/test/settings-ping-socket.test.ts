@@ -83,6 +83,8 @@ describe("room settings", () => {
       earlyBuzzPenalty: true,
       teamsEnabled: false,
       audienceVoting: false,
+      accent: "indigo",
+      title: "",
     });
   });
 

@@ -39,7 +39,7 @@ export function ButtonBuzzer({
                 ? "bg-red-900 text-red-300 cursor-not-allowed animate-pulse"
                 : disabled
                   ? "bg-slate-700 text-slate-500 cursor-not-allowed"
-                  : "bg-indigo-600 hover:bg-indigo-500 active:scale-95 active:bg-indigo-700 text-white cursor-pointer shadow-lg shadow-indigo-900"
+                  : "bg-accent-600 hover:bg-accent-500 active:scale-95 active:bg-accent-700 text-white cursor-pointer shadow-lg shadow-accent-900"
           }
         `}
       >
