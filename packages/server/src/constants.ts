@@ -32,3 +32,21 @@ export const PATTERN_MAX_LENGTH = 6;
 // heartbeat, so without coalescing a full room would broadcast several times
 // a second to show a number that changes by a few milliseconds.
 export const PING_BROADCAST_INTERVAL_MS = 2_000;
+
+// ── Teams ─────────────────────────────────────────────────────────────────
+
+export const MAX_TEAMS = 8;
+
+// Picked for contrast against the dark UI and against each other, including
+// for the common forms of colour blindness -- team colour is often the only
+// thing distinguishing two rows on a screen across the room.
+export const TEAM_COLOURS = [
+  "#6366f1", // indigo
+  "#f97316", // orange
+  "#14b8a6", // teal
+  "#ec4899", // pink
+  "#84cc16", // lime
+  "#a855f7", // purple
+  "#eab308", // yellow
+  "#06b6d4", // cyan
+] as const;

@@ -76,11 +76,12 @@ async function joinPlayer(roomCode: string, name: string) {
 // ── settings ──────────────────────────────────────────────────────────────
 
 describe("room settings", () => {
-  it("defaults to a locked window with the early-buzz penalty on", async () => {
+  it("defaults to a locked window, penalty on, teams off", async () => {
     const { room } = await openRoom();
     expect(room.settings).toEqual({
       buzzWindowMode: "locked",
       earlyBuzzPenalty: true,
+      teamsEnabled: false,
     });
   });
 

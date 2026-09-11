@@ -4,7 +4,9 @@ import type {
   PlayerView,
   RoomSettingsView,
   RoomView,
+  TeamView,
 } from "@buzzroom/shared";
+import { TEAM_COLOURS, MAX_TEAMS } from "../constants.js";
 import { generateRoomCode } from "./generateRoomCode.js";
 import type { Round } from "./round.js";
 import { toRoundView } from "./round.js";
@@ -16,6 +18,13 @@ export interface RoomSettings {
   // window; "free" means players may buzz whenever they like. See spec §5.
   buzzWindowMode: BuzzWindowMode;
   earlyBuzzPenalty: boolean; // default on; penalises buzzing during closed rounds
+  teamsEnabled: boolean; // default off; ranks teams instead of individuals
+}
+
+export interface Team {
+  teamId: string;
+  name: string;
+  colour: string;
 }
 
 export interface Player {
@@ -24,6 +33,7 @@ export interface Player {
   name: string;
   score: number;
   isConnected: boolean;
+  teamId: string | null;
   joinedAt: number;
   // Clock-sync fields; populated in Phase 5 (fairness engine)
   clockOffset: number;
@@ -36,6 +46,7 @@ export interface Room {
   hostPlayerId: string;
   hostSocketId: string;
   players: Map<string, Player>; // playerId → Player
+  teams: Map<string, Team>; // teamId → Team
   settings: RoomSettings;
   round: Round | null; // null = no active buzz round
   createdAt: number;
@@ -77,6 +88,7 @@ export class RoomStore {
       name: hostName,
       score: 0,
       isConnected: true,
+      teamId: null,
       joinedAt: Date.now(),
       clockOffset: 0,
       lastRtt: null,
@@ -88,7 +100,12 @@ export class RoomStore {
       hostPlayerId: playerId,
       hostSocketId,
       players: new Map([[playerId, player]]),
-      settings: { buzzWindowMode: "locked", earlyBuzzPenalty: true },
+      teams: new Map(),
+      settings: {
+        buzzWindowMode: "locked",
+        earlyBuzzPenalty: true,
+        teamsEnabled: false,
+      },
       round: null,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
@@ -118,6 +135,7 @@ export class RoomStore {
       name,
       score: 0,
       isConnected: true,
+      teamId: null,
       joinedAt: Date.now(),
       clockOffset: 0,
       lastRtt: null,
@@ -275,6 +293,7 @@ export class RoomStore {
       score: player.score,
       isConnected: player.isConnected,
       rttMs: player.lastRtt,
+      teamId: player.teamId,
     };
   }
 
@@ -286,6 +305,7 @@ export class RoomStore {
       players: Array.from(room.players.values()).map((p) =>
         this.toPlayerView(p),
       ),
+      teams: this.toTeamViews(room),
       settings: this.toSettingsView(room),
       round: room.round ? toRoundView(room.round) : null,
     };
@@ -295,7 +315,61 @@ export class RoomStore {
     return {
       buzzWindowMode: room.settings.buzzWindowMode,
       earlyBuzzPenalty: room.settings.earlyBuzzPenalty,
+      teamsEnabled: room.settings.teamsEnabled,
     };
+  }
+
+  toTeamViews(room: Room): TeamView[] {
+    return Array.from(room.teams.values()).map((t) => ({
+      teamId: t.teamId,
+      name: t.name,
+      colour: t.colour,
+    }));
+  }
+
+  // ---------- Teams ----------
+
+  /**
+   * Creates a team, taking the first palette colour no existing team is
+   * using so two teams are never the same colour on the big screen.
+   * Returns undefined once MAX_TEAMS is reached.
+   */
+  createTeam(room: Room, name: string): Team | undefined {
+    if (room.teams.size >= MAX_TEAMS) return undefined;
+
+    const taken = new Set(Array.from(room.teams.values()).map((t) => t.colour));
+    const colour = TEAM_COLOURS.find((c) => !taken.has(c)) ?? TEAM_COLOURS[0]!;
+
+    const team: Team = { teamId: randomUUID(), name, colour };
+    room.teams.set(team.teamId, team);
+    room.lastActivityAt = Date.now();
+    return team;
+  }
+
+  /**
+   * Removes a team and releases its members back to unassigned. Their scores
+   * are untouched -- the score lives on the player, and the team total was
+   * only ever a sum of those.
+   */
+  deleteTeam(room: Room, teamId: string): boolean {
+    if (!room.teams.delete(teamId)) return false;
+
+    for (const player of room.players.values()) {
+      if (player.teamId === teamId) player.teamId = null;
+    }
+    room.lastActivityAt = Date.now();
+    return true;
+  }
+
+  /** Moves a player onto a team, or off every team when teamId is null. */
+  assignTeam(room: Room, playerId: string, teamId: string | null): boolean {
+    const player = room.players.get(playerId);
+    if (!player) return false;
+    if (teamId !== null && !room.teams.has(teamId)) return false;
+
+    player.teamId = teamId;
+    room.lastActivityAt = Date.now();
+    return true;
   }
 
   // ---------- Settings ----------
@@ -310,6 +384,9 @@ export class RoomStore {
     }
     if (patch.earlyBuzzPenalty !== undefined) {
       room.settings.earlyBuzzPenalty = patch.earlyBuzzPenalty;
+    }
+    if (patch.teamsEnabled !== undefined) {
+      room.settings.teamsEnabled = patch.teamsEnabled;
     }
     room.lastActivityAt = Date.now();
     return room.settings;

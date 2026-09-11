@@ -7,6 +7,8 @@ import { BuzzOrder } from "../components/BuzzOrder.js";
 import { JoinQrCode } from "../components/JoinQrCode.js";
 import { Leaderboard } from "../components/Leaderboard.js";
 import { PingIndicator } from "../components/PingIndicator.js";
+import { TeamLeaderboard } from "../components/TeamLeaderboard.js";
+import { TeamManager } from "../components/TeamManager.js";
 
 const MODE_LABELS: Record<BuzzMode, string> = {
   button: "🔴 Button",
@@ -30,7 +32,8 @@ export function HostScreen() {
   const [roundPoints, setRoundPoints] = useState("1");
   const [tab, setTab] = useState<"round" | "scores">("round");
 
-  const { room, myPlayerId, leaderboard, roundResult, pings } = state;
+  const { room, myPlayerId, leaderboard, teamLeaderboard, roundResult, pings } =
+    state;
   if (!room) return null;
 
   const settings = room.settings;
@@ -178,6 +181,19 @@ export function HostScreen() {
             <label className="flex items-center gap-2 text-slate-400 text-xs">
               <input
                 type="checkbox"
+                checked={settings.teamsEnabled}
+                onChange={(e) =>
+                  socket.emit("update_settings", {
+                    teamsEnabled: e.target.checked,
+                  })
+                }
+                className="accent-indigo-500"
+              />
+              Team mode
+            </label>
+            <label className="flex items-center gap-2 text-slate-400 text-xs">
+              <input
+                type="checkbox"
                 checked={settings.earlyBuzzPenalty}
                 disabled={settings.buzzWindowMode === "free"}
                 onChange={(e) =>
@@ -282,6 +298,22 @@ export function HostScreen() {
 
       {tab === "scores" && (
         <div className="flex flex-col gap-4">
+          {settings.teamsEnabled && (
+            <TeamLeaderboard entries={teamLeaderboard} />
+          )}
+
+          {settings.teamsEnabled && (
+            <TeamManager
+              teams={room.teams}
+              players={room.players}
+              onCreate={(name) => socket.emit("create_team", { name })}
+              onDelete={(teamId) => socket.emit("delete_team", { teamId })}
+              onAssign={(playerId, teamId) =>
+                socket.emit("assign_team", { playerId, teamId })
+              }
+            />
+          )}
+
           <Leaderboard
             entries={leaderboard}
             myPlayerId={myPlayerId}

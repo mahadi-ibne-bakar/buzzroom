@@ -26,6 +26,8 @@ import type {
   ScoreUpdatePayload,
   ServerErrorPayload,
   SettingsUpdatedPayload,
+  TeamLeaderboardEntry,
+  TeamsUpdatedPayload,
   WatchOkPayload,
 } from "@buzzroom/shared";
 import { useSocket } from "./SocketContext.js";
@@ -38,6 +40,9 @@ export interface GameState {
   room: RoomView | null;
   myPlayerId: string | null;
   leaderboard: LeaderboardEntry[];
+  // Empty unless team mode is on; the server derives it from the same player
+  // scores, so it never disagrees with `leaderboard`.
+  teamLeaderboard: TeamLeaderboardEntry[];
   errorMessage: string | null;
   hostGone: boolean;
   roundResult: {
@@ -60,6 +65,7 @@ const initial: GameState = {
   room: null,
   myPlayerId: null,
   leaderboard: [],
+  teamLeaderboard: [],
   errorMessage: null,
   hostGone: false,
   roundResult: null,
@@ -73,7 +79,17 @@ export type GameAction =
   | { type: "ROOM_CREATED"; room: RoomView; myPlayerId: string }
   | { type: "JOINED"; room: RoomView; myPlayerId: string }
   | { type: "RECONNECTED"; room: RoomView; myPlayerId: string }
-  | { type: "WATCHING"; room: RoomView; leaderboard: LeaderboardEntry[] }
+  | {
+      type: "WATCHING";
+      room: RoomView;
+      leaderboard: LeaderboardEntry[];
+      teamLeaderboard: TeamLeaderboardEntry[];
+    }
+  | {
+      type: "TEAMS_UPDATED";
+      teams: TeamsUpdatedPayload["teams"];
+      players: PlayerView[];
+    }
   | { type: "PLAYER_JOINED"; player: PlayerView }
   | { type: "PLAYER_LEFT"; playerId: string }
   | { type: "HOST_LEFT" }
@@ -89,6 +105,7 @@ export type GameAction =
       type: "SCORE_UPDATED";
       players: PlayerView[];
       leaderboard: LeaderboardEntry[];
+      teamLeaderboard: TeamLeaderboardEntry[];
     }
   | {
       type: "ROUND_RESOLVED";
@@ -140,6 +157,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         room: action.room,
         myPlayerId: null,
         leaderboard: action.leaderboard,
+        teamLeaderboard: action.teamLeaderboard,
         errorMessage: null,
       };
 
@@ -225,6 +243,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         room: { ...state.room, players: action.players },
         leaderboard: action.leaderboard,
+        teamLeaderboard: action.teamLeaderboard,
+      };
+
+    case "TEAMS_UPDATED":
+      if (!state.room) return state;
+      return {
+        ...state,
+        room: {
+          ...state.room,
+          teams: action.teams,
+          players: action.players,
+        },
       };
 
     case "ROUND_RESOLVED":
@@ -317,8 +347,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         saveSession(yourPlayerId, room.roomCode);
         dispatch({ type: "JOINED", room, myPlayerId: yourPlayerId });
       },
-      watch_ok: ({ room, leaderboard }: WatchOkPayload) =>
-        dispatch({ type: "WATCHING", room, leaderboard }),
+      watch_ok: ({ room, leaderboard, teamLeaderboard }: WatchOkPayload) =>
+        dispatch({ type: "WATCHING", room, leaderboard, teamLeaderboard }),
       reconnect_ok: ({ room, yourPlayerId }: ReconnectOkPayload) => {
         saveSession(yourPlayerId, room.roomCode);
         dispatch({ type: "RECONNECTED", room, myPlayerId: yourPlayerId });
@@ -337,8 +367,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
         activePlayerId,
       }: BuzzOrderUpdatedPayload) =>
         dispatch({ type: "BUZZ_ORDER_UPDATED", buzzOrder, activePlayerId }),
-      score_update: ({ players, leaderboard }: ScoreUpdatePayload) =>
-        dispatch({ type: "SCORE_UPDATED", players, leaderboard }),
+      score_update: ({
+        players,
+        leaderboard,
+        teamLeaderboard,
+      }: ScoreUpdatePayload) =>
+        dispatch({
+          type: "SCORE_UPDATED",
+          players,
+          leaderboard,
+          teamLeaderboard,
+        }),
+      teams_updated: ({ teams, players }: TeamsUpdatedPayload) =>
+        dispatch({ type: "TEAMS_UPDATED", teams, players }),
       round_resolved: ({
         winnerPlayerId,
         winnerName,

@@ -1,6 +1,9 @@
 import type {
   AdvanceQueuePayload,
+  AssignTeamPayload,
   AwardPointsPayload,
+  CreateTeamPayload,
+  DeleteTeamPayload,
   BuzzPayload,
   CreateRoomPayload,
   JoinRoomPayload,
@@ -17,6 +20,8 @@ import type {
   RoomSettingsView,
   RoomView,
   RoundView,
+  TeamLeaderboardEntry,
+  TeamView,
 } from "./types.js";
 
 export interface RoomCreatedPayload {
@@ -54,6 +59,14 @@ export interface RoundResolvedPayload {
 export interface ScoreUpdatePayload {
   players: PlayerView[];
   leaderboard: LeaderboardEntry[];
+  // Empty unless team mode is on. A team's score is the sum of its members',
+  // so this is derived from the same player scores rather than tracked
+  // separately -- there is only ever one place a point lives.
+  teamLeaderboard: TeamLeaderboardEntry[];
+}
+export interface TeamsUpdatedPayload {
+  teams: TeamView[];
+  players: PlayerView[];
 }
 export interface SyncPongPayload {
   t0: number;
@@ -68,6 +81,7 @@ export interface PingUpdatePayload {
 export interface WatchOkPayload {
   room: RoomView;
   leaderboard: LeaderboardEntry[];
+  teamLeaderboard: TeamLeaderboardEntry[];
 }
 export interface ReconnectOkPayload {
   room: RoomView;
@@ -93,6 +107,8 @@ export type {
   ModeParams,
   BuzzWindowMode,
   RoomSettingsView,
+  TeamView,
+  TeamLeaderboardEntry,
 } from "./types.js";
 
 export interface ServerToClientEvents {
@@ -109,6 +125,7 @@ export interface ServerToClientEvents {
   score_update: (p: ScoreUpdatePayload) => void;
   sync_pong: (p: SyncPongPayload) => void;
   settings_updated: (p: SettingsUpdatedPayload) => void;
+  teams_updated: (p: TeamsUpdatedPayload) => void;
   ping_update: (p: PingUpdatePayload) => void;
   host_left: () => void;
   reconnect_ok: (p: ReconnectOkPayload) => void;
@@ -129,4 +146,7 @@ export interface ClientToServerEvents {
   reconnect_room: (p: ReconnectRoomPayload) => void;
   update_settings: (p: UpdateSettingsPayload) => void;
   watch_room: (p: WatchRoomPayload) => void;
+  create_team: (p: CreateTeamPayload) => void;
+  delete_team: (p: DeleteTeamPayload) => void;
+  assign_team: (p: AssignTeamPayload) => void;
 }

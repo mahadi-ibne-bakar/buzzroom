@@ -4,6 +4,7 @@ import { useClockSync } from "../hooks/useClockSync.js";
 import { BuzzOrder } from "../components/BuzzOrder.js";
 import { Leaderboard } from "../components/Leaderboard.js";
 import { PingIndicator } from "../components/PingIndicator.js";
+import { TeamLeaderboard } from "../components/TeamLeaderboard.js";
 import { ButtonBuzzer } from "../components/buzz/ButtonBuzzer.js";
 import { SlideBuzzer } from "../components/buzz/SlideBuzzer.js";
 import { PatternBuzzer } from "../components/buzz/PatternBuzzer.js";
@@ -35,7 +36,15 @@ export function PlayerScreen() {
   const { socket, connected } = useSocket();
   const [tab, setTab] = useState<"buzz" | "scores">("buzz");
 
-  const { room, myPlayerId, leaderboard, roundResult, lockout, pings } = state;
+  const {
+    room,
+    myPlayerId,
+    leaderboard,
+    teamLeaderboard,
+    roundResult,
+    lockout,
+    pings,
+  } = state;
   const roundOpen = room?.round?.status === "open";
   const freeBuzz = room?.settings.buzzWindowMode === "free";
 
@@ -224,7 +233,15 @@ export function PlayerScreen() {
       )}
 
       {tab === "scores" && (
-        <Leaderboard entries={leaderboard} myPlayerId={myPlayerId} />
+        <div className="flex flex-col gap-4">
+          {room.settings.teamsEnabled && (
+            <TeamLeaderboard
+              entries={teamLeaderboard}
+              myTeamId={myPlayer?.teamId ?? null}
+            />
+          )}
+          <Leaderboard entries={leaderboard} myPlayerId={myPlayerId} />
+        </div>
       )}
     </div>
   );

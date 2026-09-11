@@ -4,7 +4,7 @@ import {
   type GameState,
   type GameAction,
 } from "../contexts/GameContext.js";
-import type { RoomView } from "@buzzroom/shared";
+import type { PlayerView, RoomView } from "@buzzroom/shared";
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -13,6 +13,7 @@ const initial: GameState = {
   room: null,
   myPlayerId: null,
   leaderboard: [],
+  teamLeaderboard: [],
   errorMessage: null,
   hostGone: false,
   roundResult: null,
@@ -20,21 +21,33 @@ const initial: GameState = {
   pings: {},
 };
 
+/**
+ * A PlayerView with the fields a reducer test actually cares about. Every
+ * other field gets a default here, so adding one to the protocol doesn't mean
+ * editing fifteen literals.
+ */
+function makePlayer(
+  playerId: string,
+  name: string,
+  score: number,
+  isConnected = true,
+  teamId: string | null = null,
+): PlayerView {
+  return { playerId, name, score, isConnected, rttMs: null, teamId };
+}
+
 function makeRoom(overrides: Partial<RoomView> = {}): RoomView {
   return {
     roomId: "room-1",
     roomCode: "ABCDEF",
     hostPlayerId: "host-1",
-    settings: { buzzWindowMode: "locked", earlyBuzzPenalty: true },
-    players: [
-      {
-        playerId: "host-1",
-        name: "Host",
-        score: 0,
-        isConnected: true,
-        rttMs: null,
-      },
-    ],
+    settings: {
+      buzzWindowMode: "locked",
+      earlyBuzzPenalty: true,
+      teamsEnabled: false,
+    },
+    teams: [],
+    players: [makePlayer("host-1", "Host", 0)],
     round: null,
     ...overrides,
   };
@@ -75,22 +88,7 @@ describe("JOINED", () => {
 
   it("switches to player screen for non-hosts", () => {
     const room = makeRoom({
-      players: [
-        {
-          playerId: "host-1",
-          name: "Host",
-          score: 0,
-          isConnected: true,
-          rttMs: null,
-        },
-        {
-          playerId: "p2",
-          name: "Alice",
-          score: 0,
-          isConnected: true,
-          rttMs: null,
-        },
-      ],
+      players: [makePlayer("host-1", "Host", 0), makePlayer("p2", "Alice", 0)],
     });
     const next = dispatch(initial, { type: "JOINED", room, myPlayerId: "p2" });
     expect(next.screen).toBe("player");
@@ -110,13 +108,7 @@ describe("PLAYER_JOINED", () => {
     };
     const next = dispatch(state, {
       type: "PLAYER_JOINED",
-      player: {
-        playerId: "p2",
-        name: "Alice",
-        score: 0,
-        isConnected: true,
-        rttMs: null,
-      },
+      player: makePlayer("p2", "Alice", 0),
     });
     expect(next.room?.players).toHaveLength(2);
     expect(next.room?.players[1]?.name).toBe("Alice");
@@ -125,20 +117,8 @@ describe("PLAYER_JOINED", () => {
   it("updates an existing player (reconnect case)", () => {
     const room = makeRoom({
       players: [
-        {
-          playerId: "host-1",
-          name: "Host",
-          score: 0,
-          isConnected: true,
-          rttMs: null,
-        },
-        {
-          playerId: "p2",
-          name: "Alice",
-          score: 3,
-          isConnected: false,
-          rttMs: null,
-        },
+        makePlayer("host-1", "Host", 0),
+        makePlayer("p2", "Alice", 3, false),
       ],
     });
     const state: GameState = {
@@ -149,13 +129,7 @@ describe("PLAYER_JOINED", () => {
     };
     const next = dispatch(state, {
       type: "PLAYER_JOINED",
-      player: {
-        playerId: "p2",
-        name: "Alice",
-        score: 3,
-        isConnected: true,
-        rttMs: null,
-      },
+      player: makePlayer("p2", "Alice", 3),
     });
     expect(next.room?.players).toHaveLength(2);
     expect(
@@ -169,22 +143,7 @@ describe("PLAYER_JOINED", () => {
 describe("PLAYER_LEFT", () => {
   it("marks the player as disconnected", () => {
     const room = makeRoom({
-      players: [
-        {
-          playerId: "host-1",
-          name: "Host",
-          score: 0,
-          isConnected: true,
-          rttMs: null,
-        },
-        {
-          playerId: "p2",
-          name: "Alice",
-          score: 0,
-          isConnected: true,
-          rttMs: null,
-        },
-      ],
+      players: [makePlayer("host-1", "Host", 0), makePlayer("p2", "Alice", 0)],
     });
     const state: GameState = {
       ...initial,
@@ -315,15 +274,7 @@ describe("SCORE_UPDATED", () => {
     };
     const next = dispatch(state, {
       type: "SCORE_UPDATED",
-      players: [
-        {
-          playerId: "host-1",
-          name: "Host",
-          score: 5,
-          isConnected: true,
-          rttMs: null,
-        },
-      ],
+      players: [makePlayer("host-1", "Host", 5)],
       leaderboard: [
         {
           rank: 1,
@@ -334,6 +285,7 @@ describe("SCORE_UPDATED", () => {
           isTied: false,
         },
       ],
+      teamLeaderboard: [],
     });
     expect(next.room?.players[0]?.score).toBe(5);
     expect(next.leaderboard[0]?.score).toBe(5);
@@ -379,20 +331,8 @@ describe("hostGone", () => {
     screen: "player",
     room: makeRoom({
       players: [
-        {
-          playerId: "host-1",
-          name: "Host",
-          score: 0,
-          isConnected: false,
-          rttMs: null,
-        },
-        {
-          playerId: "p2",
-          name: "Alice",
-          score: 0,
-          isConnected: true,
-          rttMs: null,
-        },
+        makePlayer("host-1", "Host", 0, false),
+        makePlayer("p2", "Alice", 0),
       ],
     }),
     myPlayerId: "p2",
@@ -402,13 +342,7 @@ describe("hostGone", () => {
   it("stays set when a non-host player rejoins", () => {
     const next = dispatch(joined, {
       type: "PLAYER_JOINED",
-      player: {
-        playerId: "p3",
-        name: "Bob",
-        score: 0,
-        isConnected: true,
-        rttMs: null,
-      },
+      player: makePlayer("p3", "Bob", 0),
     });
     expect(next.hostGone).toBe(true);
   });
@@ -416,13 +350,7 @@ describe("hostGone", () => {
   it("clears when the host themselves rejoins", () => {
     const next = dispatch(joined, {
       type: "PLAYER_JOINED",
-      player: {
-        playerId: "host-1",
-        name: "Host",
-        score: 0,
-        isConnected: true,
-        rttMs: null,
-      },
+      player: makePlayer("host-1", "Host", 0),
     });
     expect(next.hostGone).toBe(false);
   });
@@ -530,7 +458,11 @@ describe("SETTINGS_UPDATED", () => {
 
     const next = dispatch(joined, {
       type: "SETTINGS_UPDATED",
-      settings: { buzzWindowMode: "free", earlyBuzzPenalty: false },
+      settings: {
+        buzzWindowMode: "free",
+        earlyBuzzPenalty: false,
+        teamsEnabled: false,
+      },
     });
 
     expect(next.room?.settings.buzzWindowMode).toBe("free");
@@ -540,7 +472,11 @@ describe("SETTINGS_UPDATED", () => {
   it("is a no-op before a room exists", () => {
     const next = dispatch(initial, {
       type: "SETTINGS_UPDATED",
-      settings: { buzzWindowMode: "free", earlyBuzzPenalty: true },
+      settings: {
+        buzzWindowMode: "free",
+        earlyBuzzPenalty: true,
+        teamsEnabled: false,
+      },
     });
     expect(next).toBe(initial);
   });

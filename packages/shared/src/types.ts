@@ -1,8 +1,17 @@
+export interface TeamView {
+  teamId: string;
+  name: string;
+  colour: string; // hex, assigned on creation from a fixed palette
+}
+
 export interface PlayerView {
   playerId: string;
   name: string;
   score: number;
   isConnected: boolean;
+  // Which team this player scores for, or null when they're unassigned or
+  // team mode is off.
+  teamId: string | null;
   // Last round-trip time this player reported, in ms. Only the client can
   // measure it (the calculation needs its own receive time), so it rides
   // along on the next sync_ping. null until that first report lands.
@@ -21,6 +30,10 @@ export type BuzzWindowMode = "free" | "locked";
 export interface RoomSettingsView {
   buzzWindowMode: BuzzWindowMode;
   earlyBuzzPenalty: boolean;
+  // When on, the leaderboard ranks teams instead of individuals. Player
+  // scores still exist underneath -- a team's score is the sum of its
+  // members' -- so switching modes never loses anything.
+  teamsEnabled: boolean;
 }
 
 export type BuzzMode = "button" | "slide" | "pattern";
@@ -50,6 +63,16 @@ export interface RoundView {
   buzzOrder: BuzzEntryView[];
 }
 
+export interface TeamLeaderboardEntry {
+  rank: number;
+  teamId: string;
+  name: string;
+  colour: string;
+  score: number;
+  memberCount: number;
+  isTied: boolean;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   playerId: string;
@@ -64,6 +87,7 @@ export interface RoomView {
   roomCode: string;
   hostPlayerId: string;
   players: PlayerView[];
+  teams: TeamView[];
   settings: RoomSettingsView;
   round: RoundView | null;
 }

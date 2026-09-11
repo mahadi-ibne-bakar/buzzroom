@@ -1,5 +1,6 @@
 import { useGame } from "../contexts/GameContext.js";
 import { JoinQrCode } from "../components/JoinQrCode.js";
+import { TeamLeaderboard } from "../components/TeamLeaderboard.js";
 
 /**
  * The big-screen view (spec §13): room code and join QR, the live buzz order,
@@ -11,7 +12,7 @@ import { JoinQrCode } from "../components/JoinQrCode.js";
  */
 export function PresenterScreen() {
   const { state } = useGame();
-  const { room, leaderboard, roundResult } = state;
+  const { room, leaderboard, teamLeaderboard, roundResult } = state;
 
   if (!room) {
     return (
@@ -128,9 +129,11 @@ export function PresenterScreen() {
           {/* ── Leaderboard ── */}
           <section className="flex flex-col gap-4 min-h-0">
             <h2 className="text-slate-500 text-xl uppercase tracking-[0.2em]">
-              Scores
+              {room.settings.teamsEnabled ? "Teams" : "Scores"}
             </h2>
-            {leaderboard.length === 0 ? (
+            {room.settings.teamsEnabled ? (
+              <TeamLeaderboard entries={teamLeaderboard} large />
+            ) : leaderboard.length === 0 ? (
               <p className="text-3xl text-slate-600">No scores yet</p>
             ) : (
               <ol className="flex flex-col gap-2 overflow-hidden">

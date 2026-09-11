@@ -70,6 +70,23 @@ export const AwardPointsPayloadSchema = z.object({
 });
 export type AwardPointsPayload = z.infer<typeof AwardPointsPayloadSchema>;
 
+export const CreateTeamPayloadSchema = z.object({
+  name: z.string().min(1).max(20),
+});
+export type CreateTeamPayload = z.infer<typeof CreateTeamPayloadSchema>;
+
+export const DeleteTeamPayloadSchema = z.object({
+  teamId: z.string().uuid(),
+});
+export type DeleteTeamPayload = z.infer<typeof DeleteTeamPayloadSchema>;
+
+// teamId null moves the player back out of every team.
+export const AssignTeamPayloadSchema = z.object({
+  playerId: z.string().uuid(),
+  teamId: z.string().uuid().nullable(),
+});
+export type AssignTeamPayload = z.infer<typeof AssignTeamPayloadSchema>;
+
 // A presenter screen watches a room without taking a seat in it: no name, no
 // player record, no place in the leaderboard.
 export const WatchRoomPayloadSchema = z.object({
@@ -95,6 +112,7 @@ export const UpdateSettingsPayloadSchema = z
   .object({
     buzzWindowMode: z.enum(["free", "locked"]).optional(),
     earlyBuzzPenalty: z.boolean().optional(),
+    teamsEnabled: z.boolean().optional(),
   })
   .refine((p) => Object.values(p).some((v) => v !== undefined), {
     message: "at least one setting must be provided",

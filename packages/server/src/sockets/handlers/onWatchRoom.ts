@@ -1,6 +1,6 @@
 import type { WatchRoomPayload } from "@buzzroom/shared";
-import { buildLeaderboard } from "../../rooms/leaderboard.js";
 import type { RoomStore } from "../../rooms/RoomStore.js";
+import { buildScoreUpdate } from "../scoreHelpers.js";
 import type { TypedServer, TypedSocket } from "../../socketTypes.js";
 
 /**
@@ -36,9 +36,11 @@ export function onWatchRoom(
   // normally carries it -- only fires when a score changes. A presenter
   // attached mid-game would otherwise show an empty board until the next
   // point was awarded.
+  const scores = buildScoreUpdate(room, store);
   socket.emit("watch_ok", {
     room: store.toRoomView(room),
-    leaderboard: buildLeaderboard(Array.from(room.players.values())),
+    leaderboard: scores.leaderboard,
+    teamLeaderboard: scores.teamLeaderboard,
   });
 
   console.log(`[room] presenter attached to ${room.roomCode}`);

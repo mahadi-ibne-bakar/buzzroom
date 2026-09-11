@@ -1,6 +1,9 @@
 import {
   AdvanceQueuePayloadSchema,
+  AssignTeamPayloadSchema,
   AwardPointsPayloadSchema,
+  CreateTeamPayloadSchema,
+  DeleteTeamPayloadSchema,
   BuzzPayloadSchema,
   CreateRoomPayloadSchema,
   JoinRoomPayloadSchema,
@@ -24,6 +27,11 @@ import { onReconnect } from "./handlers/onReconnect.js";
 import { onResetRound } from "./handlers/onResetRound.js";
 import { onSyncPing } from "./handlers/onSyncPing.js";
 import { onUpdateSettings } from "./handlers/onUpdateSettings.js";
+import {
+  onAssignTeam,
+  onCreateTeam,
+  onDeleteTeam,
+} from "./handlers/onTeams.js";
 import { onWatchRoom } from "./handlers/onWatchRoom.js";
 import { SocketRateLimiter } from "./rateLimiter.js";
 
@@ -150,6 +158,29 @@ export function registerSocketHandlers(
       const data = validate(UpdateSettingsPayloadSchema, payload);
       if (!data) return;
       onUpdateSettings(io, socket, store, data);
+    });
+
+    // ── Teams ─────────────────────────────────────────────────────────────
+
+    socket.on("create_team", (payload) => {
+      if (!rateCheck("create_team", 30)) return;
+      const data = validate(CreateTeamPayloadSchema, payload);
+      if (!data) return;
+      onCreateTeam(io, socket, store, data);
+    });
+
+    socket.on("delete_team", (payload) => {
+      if (!rateCheck("delete_team", 30)) return;
+      const data = validate(DeleteTeamPayloadSchema, payload);
+      if (!data) return;
+      onDeleteTeam(io, socket, store, data);
+    });
+
+    socket.on("assign_team", (payload) => {
+      if (!rateCheck("assign_team", 120)) return;
+      const data = validate(AssignTeamPayloadSchema, payload);
+      if (!data) return;
+      onAssignTeam(io, socket, store, data);
     });
 
     socket.on("award_points", (payload) => {
