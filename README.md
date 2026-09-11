@@ -24,7 +24,9 @@ apart.
 
 ## Status
 
-Feature-complete against the v1 scope in the spec.
+Everything in the v1 scope, plus most of what the spec deferred past it.
+
+**Core game**
 
 - **Rooms** — create/join by 6-character code or QR scan, name sanitising and
   duplicate detection, a 20-player cap, and idle-room expiry.
@@ -54,9 +56,46 @@ Feature-complete against the v1 scope in the spec.
   their score and any buzz they already made intact; a host disconnect pauses
   the game rather than ending it.
 
-Deferred to post-v1 by the spec itself (§13): team mode, a separate presenter
-view, a native app wrapper, saved question banks, sound and theming, the
-audience agree/disagree mechanic, and multi-server scaling.
+**Beyond v1**
+
+- **Presenter view** — a read-only big-screen view at `/?present=CODE` with the
+  room code and QR at poster size, the live buzz order and the leaderboard. It
+  attaches as an observer, so it costs neither a player slot nor a leaderboard
+  row.
+- **Team mode** — group players into teams and rank teams instead of
+  individuals. A team's score is the sum of its members', derived on read, so a
+  point only ever lives in one place and moving someone between teams needs no
+  transfer logic.
+- **Audience voting** — while the host has someone called on, everyone else can
+  register agree/disagree. Advisory only; it never moves a score.
+- **Question banks and history** — paste in a list of questions, step through
+  them onto the presenter screen, and get a log of resolved rounds that
+  survives between sessions. Both live in the host's browser, not the server.
+- **Sound, themes and branding** — synthesised game-show cues with a per-device
+  mute, four room accent colours, and a room title for the big screen.
+- **Installable** — manifest, maskable icons and a shell-caching service worker,
+  so it adds to a phone's home screen and runs full screen.
+
+## Not built, and why
+
+Two items from the spec's deferred list (§13) are deliberately still open,
+because neither is a coding task so much as a decision:
+
+- **Native mobile app wrapper.** The installable PWA above delivers what the
+  wrapper is usually wanted for — home-screen icon, full screen, no address
+  bar. A real wrapper (Capacitor or similar) additionally means native build
+  tooling, signing config, and app store accounts and review, none of which can
+  be built or verified from this repo alone. Worth doing only if you actually
+  need store distribution or a native API.
+- **Multi-server scaling (Redis backplane).** Adding Socket.io's Redis adapter
+  alone would produce a _broken_ system rather than a scaled one: it
+  synchronises event broadcasting, but every room, round, buzz order and lockout
+  lives in `RoomStore`'s in-memory maps, so a player reaching a second instance
+  simply would not find the room. Real multi-instance support means moving that
+  state into Redis with atomic ordering for buzzes — a rewrite of the store and
+  every handler, and a genuine design conversation about the fairness engine's
+  consistency. The spec scopes v1 at 2–30 players per room, which one process
+  handles comfortably.
 
 ## Setup
 
