@@ -109,6 +109,10 @@ export interface RoomView {
   hostPlayerId: string;
   players: PlayerView[];
   teams: TeamView[];
+  // The question the host is currently on, for the presenter screen. Empty
+  // when the host isn't using a question bank. The bank itself lives in the
+  // host's browser -- the server only ever knows the current line.
+  currentQuestion: string;
   settings: RoomSettingsView;
   round: RoundView | null;
 }

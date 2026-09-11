@@ -10,6 +10,7 @@ import {
   JoinRoomPayloadSchema,
   OpenBuzzPayloadSchema,
   ReconnectRoomPayloadSchema,
+  SetQuestionPayloadSchema,
   SyncPingPayloadSchema,
   UpdateSettingsPayloadSchema,
   WatchRoomPayloadSchema,
@@ -34,6 +35,7 @@ import {
   onDeleteTeam,
 } from "./handlers/onTeams.js";
 import { onCastVote } from "./handlers/onCastVote.js";
+import { onSetQuestion } from "./handlers/onSetQuestion.js";
 import { onWatchRoom } from "./handlers/onWatchRoom.js";
 import { SocketRateLimiter } from "./rateLimiter.js";
 
@@ -160,6 +162,13 @@ export function registerSocketHandlers(
       const data = validate(UpdateSettingsPayloadSchema, payload);
       if (!data) return;
       onUpdateSettings(io, socket, store, data);
+    });
+
+    socket.on("set_question", (payload) => {
+      if (!rateCheck("set_question", 120)) return;
+      const data = validate(SetQuestionPayloadSchema, payload);
+      if (!data) return;
+      onSetQuestion(io, socket, store, data);
     });
 
     // Voting is cheap and people mash it; the budget is deliberately loose

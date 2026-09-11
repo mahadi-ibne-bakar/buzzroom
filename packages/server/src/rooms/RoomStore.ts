@@ -53,6 +53,7 @@ export interface Room {
   teams: Map<string, Team>; // teamId → Team
   settings: RoomSettings;
   round: Round | null; // null = no active buzz round
+  currentQuestion: string; // host's current prompt, echoed to the presenter
   createdAt: number;
   lastActivityAt: number;
   // Throttle for ping_update broadcasts. Players sync every few seconds each,
@@ -114,6 +115,7 @@ export class RoomStore {
         title: "",
       },
       round: null,
+      currentQuestion: "",
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
       lastPingBroadcastAt: 0,
@@ -313,6 +315,7 @@ export class RoomStore {
         this.toPlayerView(p),
       ),
       teams: this.toTeamViews(room),
+      currentQuestion: room.currentQuestion,
       settings: this.toSettingsView(room),
       round: room.round ? toRoundView(room.round) : null,
     };

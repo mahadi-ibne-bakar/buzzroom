@@ -10,6 +10,7 @@ import type {
   JoinRoomPayload,
   OpenBuzzPayload,
   ReconnectRoomPayload,
+  SetQuestionPayload,
   SyncPingPayload,
   UpdateSettingsPayload,
   WatchRoomPayload,
@@ -65,6 +66,9 @@ export interface ScoreUpdatePayload {
   // so this is derived from the same player scores rather than tracked
   // separately -- there is only ever one place a point lives.
   teamLeaderboard: TeamLeaderboardEntry[];
+}
+export interface QuestionChangedPayload {
+  text: string;
 }
 export interface VoteTallyPayload {
   tally: VoteTally;
@@ -135,6 +139,7 @@ export interface ServerToClientEvents {
   settings_updated: (p: SettingsUpdatedPayload) => void;
   teams_updated: (p: TeamsUpdatedPayload) => void;
   vote_tally: (p: VoteTallyPayload) => void;
+  question_changed: (p: QuestionChangedPayload) => void;
   ping_update: (p: PingUpdatePayload) => void;
   host_left: () => void;
   reconnect_ok: (p: ReconnectOkPayload) => void;
@@ -159,4 +164,5 @@ export interface ClientToServerEvents {
   delete_team: (p: DeleteTeamPayload) => void;
   assign_team: (p: AssignTeamPayload) => void;
   cast_vote: (p: CastVotePayload) => void;
+  set_question: (p: SetQuestionPayload) => void;
 }

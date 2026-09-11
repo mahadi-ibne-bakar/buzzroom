@@ -29,6 +29,26 @@ function waitForEvent<T>(socket: ClientSocket, event: string): Promise<T> {
   return new Promise((resolve) => socket.once(event, (p: T) => resolve(p)));
 }
 
+/**
+ * Waits for a tally with the expected counts.
+ *
+ * Several tallies are often in flight: an accepted buzz broadcasts one (that
+ * is what makes the vote panel appear), and so does every vote and every
+ * advance. Waiting for "the next tally" would latch onto whichever arrived
+ * first rather than the one under test.
+ */
+function waitForTally(
+  socket: ClientSocket,
+  agree: number,
+  disagree: number,
+): Promise<VoteTallyPayload> {
+  return waitForMatching<VoteTallyPayload>(
+    socket,
+    "vote_tally",
+    (p) => p.tally.agree === agree && p.tally.disagree === disagree,
+  );
+}
+
 function waitForMatching<T>(
   socket: ClientSocket,
   event: string,
@@ -118,26 +138,23 @@ describe("audience voting", () => {
   it("broadcasts a tally naming who is being voted on", async () => {
     const { host, alice, bob } = await roomWithActivePlayer();
 
-    const tallied = waitForEvent<VoteTallyPayload>(host, "vote_tally");
+    const tallied = waitForTally(host, 1, 0);
     bob.player.emit("cast_vote", { vote: "agree" });
 
-    const { tally } = await tallied;
-    expect(tally.activePlayerId).toBe(alice.playerId);
-    expect(tally).toMatchObject({ agree: 1, disagree: 0 });
+    expect((await tallied).tally.activePlayerId).toBe(alice.playerId);
   });
 
   it("replaces a voter's earlier vote rather than stacking it", async () => {
     const { host, bob } = await roomWithActivePlayer();
 
-    let tallied = waitForEvent<VoteTallyPayload>(host, "vote_tally");
+    const agreed = waitForTally(host, 1, 0);
     bob.player.emit("cast_vote", { vote: "agree" });
-    await tallied;
-
-    tallied = waitForEvent<VoteTallyPayload>(host, "vote_tally");
-    bob.player.emit("cast_vote", { vote: "disagree" });
+    await agreed;
 
     // One voter, one vote -- changing your mind is fine, voting twice is not.
-    expect((await tallied).tally).toMatchObject({ agree: 0, disagree: 1 });
+    const changed = waitForTally(host, 0, 1);
+    bob.player.emit("cast_vote", { vote: "disagree" });
+    await changed;
   });
 
   it("refuses a vote from the player being voted on", async () => {
@@ -203,22 +220,24 @@ describe("audience voting", () => {
     bob.player.emit("buzz", { mode: "button", localTime: t, adjustedTime: t });
     await ordered;
 
-    const tallied = waitForEvent<VoteTallyPayload>(host, "vote_tally");
+    const tallied = waitForTally(host, 1, 0);
     bob.player.emit("cast_vote", { vote: "agree" });
     await tallied;
 
-    const reset = waitForEvent<VoteTallyPayload>(host, "vote_tally");
+    const reset = waitForMatching<VoteTallyPayload>(
+      host,
+      "vote_tally",
+      (p) => p.tally.activePlayerId === bob.playerId,
+    );
     host.emit("advance_queue", { result: "wrong", points: 1 });
 
-    const { tally } = await reset;
-    expect(tally.activePlayerId).toBe(bob.playerId);
-    expect(tally).toMatchObject({ agree: 0, disagree: 0 });
+    expect((await reset).tally).toMatchObject({ agree: 0, disagree: 0 });
   });
 
   it("clears the tally once the round resolves", async () => {
     const { host, bob } = await roomWithActivePlayer();
 
-    const tallied = waitForEvent<VoteTallyPayload>(host, "vote_tally");
+    const tallied = waitForTally(host, 1, 0);
     bob.player.emit("cast_vote", { vote: "agree" });
     await tallied;
 
@@ -235,7 +254,7 @@ describe("audience voting", () => {
   it("does not carry votes across to a new round", async () => {
     const { host, alice, bob } = await roomWithActivePlayer();
 
-    const tallied = waitForEvent<VoteTallyPayload>(host, "vote_tally");
+    const tallied = waitForTally(host, 0, 1);
     bob.player.emit("cast_vote", { vote: "disagree" });
     await tallied;
 
@@ -255,10 +274,9 @@ describe("audience voting", () => {
     });
     await ordered;
 
-    const fresh = waitForEvent<VoteTallyPayload>(host, "vote_tally");
+    const fresh = waitForTally(host, 1, 0);
     bob.player.emit("cast_vote", { vote: "agree" });
-
-    expect((await fresh).tally).toMatchObject({ agree: 1, disagree: 0 });
+    await fresh;
   });
 });
 
@@ -288,12 +306,15 @@ describe("vote panel availability", () => {
     host.emit("open_buzz", { buzzMode: "button" });
     await opened;
 
-    const tallied = waitForEvent<VoteTallyPayload>(host, "vote_tally");
+    const tallied = waitForMatching<VoteTallyPayload>(
+      host,
+      "vote_tally",
+      (p) => p.tally.activePlayerId === playerId,
+    );
     const t = Date.now();
     player.emit("buzz", { mode: "button", localTime: t, adjustedTime: t });
 
     const { tally } = await tallied;
-    expect(tally.activePlayerId).toBe(playerId);
     expect(tally).toMatchObject({ agree: 0, disagree: 0 });
   });
 

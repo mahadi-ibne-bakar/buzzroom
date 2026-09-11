@@ -1,13 +1,21 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ACCENTS, type BuzzMode, type BuzzWindowMode } from "@buzzroom/shared";
 import { useGame } from "../contexts/GameContext.js";
 import { useSocket } from "../contexts/SocketContext.js";
 import { useClockSync } from "../hooks/useClockSync.js";
+import {
+  appendHistory,
+  clearHistory,
+  loadHistory,
+  type HistoryEntry,
+} from "../lib/questionBank.js";
 import { AudienceVote } from "../components/AudienceVote.js";
 import { BuzzOrder } from "../components/BuzzOrder.js";
 import { JoinQrCode } from "../components/JoinQrCode.js";
 import { Leaderboard } from "../components/Leaderboard.js";
 import { PingIndicator } from "../components/PingIndicator.js";
+import { GameHistory } from "../components/GameHistory.js";
+import { QuestionBank } from "../components/QuestionBank.js";
 import { SoundToggle } from "../components/SoundToggle.js";
 import { TeamLeaderboard } from "../components/TeamLeaderboard.js";
 import { TeamManager } from "../components/TeamManager.js";
@@ -32,7 +40,8 @@ export function HostScreen() {
   // carried this (AdvanceQueuePayload.points) but the UI never sent it, so
   // every question was hard-wired to 1 point.
   const [roundPoints, setRoundPoints] = useState("1");
-  const [tab, setTab] = useState<"round" | "scores">("round");
+  const [tab, setTab] = useState<"round" | "scores" | "prep">("round");
+  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
 
   const {
     room,
@@ -44,6 +53,23 @@ export function HostScreen() {
     voteTally,
   } = state;
   if (!room) return null;
+
+  // Log each resolved round once. Keyed on the result object identity rather
+  // than a field, because the same player can win consecutive rounds with the
+  // same points on the same question.
+  const loggedResult = useRef<object | null>(null);
+  useEffect(() => {
+    if (!roundResult || loggedResult.current === roundResult) return;
+    loggedResult.current = roundResult;
+    setHistory(
+      appendHistory({
+        at: Date.now(),
+        question: room?.currentQuestion ?? "",
+        winnerName: roundResult.winnerName,
+        points: roundResult.pointsAwarded,
+      }),
+    );
+  }, [roundResult, room?.currentQuestion]);
 
   const votedOnName =
     room.players.find((p) => p.playerId === voteTally.activePlayerId)?.name ??
@@ -150,7 +176,7 @@ export function HostScreen() {
 
       {/* Tabs */}
       <div className="flex rounded-xl bg-slate-800 p-1 gap-1">
-        {(["round", "scores"] as const).map((t) => (
+        {(["round", "scores", "prep"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -160,7 +186,7 @@ export function HostScreen() {
                 : "text-slate-400 hover:text-white"
             }`}
           >
-            {t === "round" ? "Round" : "Scores"}
+            {t === "round" ? "Round" : t === "scores" ? "Scores" : "Prep"}
           </button>
         ))}
       </div>
@@ -308,6 +334,12 @@ export function HostScreen() {
             </button>
           )}
 
+          {room.currentQuestion && (
+            <p className="bg-slate-800 rounded-2xl p-4 text-white">
+              {room.currentQuestion}
+            </p>
+          )}
+
           {settings.audienceVoting && (
             <AudienceVote tally={voteTally} activeName={votedOnName} />
           )}
@@ -356,6 +388,22 @@ export function HostScreen() {
               />
             </div>
           )}
+        </div>
+      )}
+
+      {tab === "prep" && (
+        <div className="flex flex-col gap-4">
+          <QuestionBank
+            currentQuestion={room.currentQuestion}
+            onSelect={(text) => socket.emit("set_question", { text })}
+          />
+          <GameHistory
+            entries={history}
+            onClear={() => {
+              clearHistory();
+              setHistory([]);
+            }}
+          />
         </div>
       )}
 

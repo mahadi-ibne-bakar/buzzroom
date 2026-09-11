@@ -31,6 +31,7 @@ import type {
   AudienceVote,
   VoteTally,
   VoteTallyPayload,
+  QuestionChangedPayload,
   WatchOkPayload,
 } from "@buzzroom/shared";
 import { useSocket } from "./SocketContext.js";
@@ -129,6 +130,7 @@ export type GameAction =
   | { type: "SETTINGS_UPDATED"; settings: RoomSettingsView }
   | { type: "PING_UPDATE"; pings: PingUpdatePayload["pings"] }
   | { type: "VOTE_TALLY"; tally: VoteTally }
+  | { type: "QUESTION_CHANGED"; text: string }
   | { type: "MY_VOTE"; vote: AudienceVote }
   | { type: "ERROR"; message: string }
   | { type: "CLEAR_ERROR" }
@@ -329,6 +331,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "MY_VOTE":
       return { ...state, myVote: action.vote };
 
+    case "QUESTION_CHANGED":
+      if (!state.room) return state;
+      return {
+        ...state,
+        room: { ...state.room, currentQuestion: action.text },
+      };
+
     case "ERROR":
       return { ...state, errorMessage: action.message };
 
@@ -444,6 +453,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "PING_UPDATE", pings }),
       vote_tally: ({ tally }: VoteTallyPayload) =>
         dispatch({ type: "VOTE_TALLY", tally }),
+      question_changed: ({ text }: QuestionChangedPayload) =>
+        dispatch({ type: "QUESTION_CHANGED", text }),
       server_error: ({ message }: ServerErrorPayload) =>
         dispatch({ type: "ERROR", message }),
     } as const;

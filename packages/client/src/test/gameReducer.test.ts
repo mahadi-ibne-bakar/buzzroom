@@ -63,6 +63,7 @@ function makeRoom(overrides: Partial<RoomView> = {}): RoomView {
     hostPlayerId: "host-1",
     settings: makeSettings(),
     teams: [],
+    currentQuestion: "",
     players: [makePlayer("host-1", "Host", 0)],
     round: null,
     ...overrides,

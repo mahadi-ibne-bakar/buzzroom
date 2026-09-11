@@ -70,6 +70,11 @@ export const AwardPointsPayloadSchema = z.object({
 });
 export type AwardPointsPayload = z.infer<typeof AwardPointsPayloadSchema>;
 
+export const SetQuestionPayloadSchema = z.object({
+  text: z.string().max(300),
+});
+export type SetQuestionPayload = z.infer<typeof SetQuestionPayloadSchema>;
+
 export const CastVotePayloadSchema = z.object({
   vote: z.enum(["agree", "disagree"]),
 });

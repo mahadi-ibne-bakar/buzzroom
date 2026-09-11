@@ -62,6 +62,13 @@ export function PresenterScreen() {
         </div>
       </div>
 
+      {/* The question the host is on, when they're using a bank */}
+      {room.currentQuestion && !roundResult && (
+        <p className="text-4xl text-white font-medium leading-snug">
+          {room.currentQuestion}
+        </p>
+      )}
+
       {/* ── Round result takes over the screen when one lands ── */}
       {roundResult ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-green-900/40 rounded-3xl">
