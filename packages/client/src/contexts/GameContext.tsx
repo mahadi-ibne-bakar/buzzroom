@@ -455,8 +455,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "VOTE_TALLY", tally }),
       question_changed: ({ text }: QuestionChangedPayload) =>
         dispatch({ type: "QUESTION_CHANGED", text }),
-      server_error: ({ message }: ServerErrorPayload) =>
-        dispatch({ type: "ERROR", message }),
+      server_error: ({ code, message }: ServerErrorPayload) => {
+        // A stale session is not a mistake the player made -- their tab held
+        // a session for a room that has since ended. Reuse LEAVE, which
+        // clears the stored session and returns to the landing screen, rather
+        // than greeting them with a red error toast they can do nothing with.
+        if (code === "SESSION_EXPIRED") {
+          dispatch({ type: "LEAVE" });
+          return;
+        }
+        dispatch({ type: "ERROR", message });
+      },
     } as const;
 
     for (const [event, handler] of Object.entries(handlers)) {

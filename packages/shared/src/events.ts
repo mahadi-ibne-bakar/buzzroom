@@ -101,6 +101,10 @@ export interface ServerErrorPayload {
     | "VALIDATION_ERROR"
     | "RATE_LIMITED"
     | "ROOM_NOT_FOUND"
+    // A restored session pointed at a room that has since ended. Distinct
+    // from ROOM_NOT_FOUND because the player never typed anything: the app
+    // read the code out of storage, so there is nothing for them to correct.
+    | "SESSION_EXPIRED"
     | "ROOM_FULL"
     | "NAME_TAKEN"
     | "NAME_INVALID"

@@ -528,3 +528,31 @@ describe("PING_UPDATE", () => {
     expect(next.pings).toEqual({ "host-1": 15 });
   });
 });
+
+// ── stale session ─────────────────────────────────────────────────────────
+
+describe("stale session recovery", () => {
+  it("LEAVE clears the stored session and returns to the landing screen", () => {
+    // The SESSION_EXPIRED server error routes through LEAVE, so a tab holding
+    // a session for a room that has since ended lands back on the landing
+    // screen with nothing stored rather than showing an error toast.
+    sessionStorage.setItem(
+      "buzzroom-session",
+      JSON.stringify({ playerId: "p2", roomCode: "ABCDEF" }),
+    );
+    const playing: GameState = {
+      ...initial,
+      screen: "player",
+      room: makeRoom(),
+      myPlayerId: "p2",
+      errorMessage: "something earlier",
+    };
+
+    const next = dispatch(playing, { type: "LEAVE" });
+
+    expect(next.screen).toBe("landing");
+    expect(next.room).toBeNull();
+    expect(next.errorMessage).toBeNull();
+    expect(sessionStorage.getItem("buzzroom-session")).toBeNull();
+  });
+});

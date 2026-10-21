@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useGame } from "../contexts/GameContext.js";
 import { useSocket } from "../contexts/SocketContext.js";
 import { parseRoomCodeFromSearch } from "../lib/joinLink.js";
+import { whenConnected } from "../lib/whenConnected.js";
 
 export function LandingScreen() {
   const { socket } = useSocket();
+  const { state } = useGame();
   // A scanned QR code lands here as /?room=ABCDEF (see JoinQrCode). Read it
   // once on first render so the join form opens pre-filled and the player
   // only has to type a name.
@@ -18,25 +21,30 @@ export function LandingScreen() {
   const [code, setCode] = useState(scannedCode);
   const [busy, setBusy] = useState(false);
 
+  // A rejected create or join (NAME_TAKEN, ROOM_NOT_FOUND, ROOM_FULL …) has to
+  // release the button. Without this the form stays on "Connecting…" and the
+  // only way out is a page reload.
+  useEffect(() => {
+    if (state.errorMessage) setBusy(false);
+  }, [state.errorMessage]);
+
   const handleHost = () => {
     if (!name.trim()) return;
     setBusy(true);
-    socket.connect();
-    socket.once("connect", () => {
-      socket.emit("create_room", { hostName: name.trim() });
-    });
+    whenConnected(socket, () =>
+      socket.emit("create_room", { hostName: name.trim() }),
+    );
   };
 
   const handleJoin = () => {
     if (!name.trim() || code.length !== 6) return;
     setBusy(true);
-    socket.connect();
-    socket.once("connect", () => {
+    whenConnected(socket, () =>
       socket.emit("join_room", {
         roomCode: code.toUpperCase(),
         playerName: name.trim(),
-      });
-    });
+      }),
+    );
   };
 
   if (mode === "home") {

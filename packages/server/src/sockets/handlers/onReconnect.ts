@@ -24,11 +24,12 @@ export function onReconnect(
   );
 
   if (!result) {
-    // Either the room expired or this playerId was never in it. The client
-    // treats this as "your session is stale" and drops back to the landing
-    // screen rather than retrying.
+    // Either the room expired or this playerId was never in it. The player
+    // did not type this code -- the app restored it from session storage --
+    // so SESSION_EXPIRED tells the client to drop quietly back to the landing
+    // screen instead of showing an error it cannot act on.
     socket.emit("server_error", {
-      code: "ROOM_NOT_FOUND",
+      code: "SESSION_EXPIRED",
       message: "That game is no longer available.",
     });
     return;

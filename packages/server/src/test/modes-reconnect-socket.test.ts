@@ -331,7 +331,9 @@ describe("reconnect_room", () => {
     const err = waitForEvent<ServerErrorPayload>(client, "server_error");
     client.emit("reconnect_room", { playerId: badPlayerId, roomCode });
 
-    expect((await err).code).toBe("ROOM_NOT_FOUND");
+    // Not ROOM_NOT_FOUND: the player never typed this code, so the client
+    // drops them to the landing screen instead of showing an error.
+    expect((await err).code).toBe("SESSION_EXPIRED");
   });
 });
 
