@@ -16,7 +16,7 @@ export function Leaderboard({ entries, myPlayerId, pings }: Props) {
   }
 
   return (
-    <ol className="flex flex-col gap-1">
+    <ol data-testid="leaderboard" className="flex flex-col gap-1">
       {entries.map((entry) => (
         <li
           key={entry.playerId}

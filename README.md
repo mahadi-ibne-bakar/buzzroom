@@ -114,7 +114,8 @@ cp packages/server/.env.example packages/server/.env
 | `npm run typecheck`    | Type-check every package                             |
 | `npm run format`       | Auto-format every package with Prettier              |
 | `npm run format:check` | Check formatting without changing files (used in CI) |
-| `npm test`             | Run tests in every package that has them             |
+| `npm test`             | Run unit and socket tests in every package           |
+| `npm run test:e2e`     | Build, then drive the real app in a browser          |
 
 ## Running it in development
 
@@ -134,6 +135,33 @@ http://localhost:3001/health` to check) and the client on
 sides: host a game in one, join with the room code in the other.
 
 Point the client at a different backend with `VITE_SERVER_URL`.
+
+## Testing
+
+Three layers, each catching what the one below cannot:
+
+- **Unit** — pure logic with no I/O: the game reducer, leaderboard ranking,
+  buzz payload construction, join-link parsing.
+- **Socket** — a real Socket.io server and real clients over a loopback port,
+  covering the protocol end of things: ranking by `adjustedTime`, gesture
+  credentials, reconnect, scoring, teams, voting.
+- **End-to-end** (`packages/e2e`) — Playwright driving Chromium against the
+  _production_ build: the bundled server serving the built client on one
+  origin. Each test opens a separate browser context per participant, so host,
+  player and presenter have their own sessions.
+
+`npm test` runs the first two and takes about a second. `npm run test:e2e`
+builds and runs the third; it needs Chromium once, via
+`npx playwright install chromium`.
+
+The end-to-end layer earns its place by catching a class the others
+structurally cannot. Three bugs in this codebase typechecked, linted and
+passed every unit test while being completely broken in a browser: a buzz
+payload the client could never send, an accent theme that changed nothing
+visible, and a connect race that left the join form stuck on "Connecting…"
+whenever the socket happened to be open already. The specs covering those
+three are marked as regressions, and each was checked by reverting its fix
+and confirming the test fails.
 
 ## Deploying
 

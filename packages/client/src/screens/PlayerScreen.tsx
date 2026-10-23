@@ -112,7 +112,9 @@ export function PlayerScreen() {
         <div className="flex items-center gap-3">
           <div className="text-right">
             <div className="text-slate-400 text-xs">Score</div>
-            <div className="text-white font-bold">{myPlayer?.score ?? 0}</div>
+            <div data-testid="my-score" className="text-white font-bold">
+              {myPlayer?.score ?? 0}
+            </div>
           </div>
           <SoundToggle />
           <button

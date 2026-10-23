@@ -108,7 +108,10 @@ export function PresenterScreen() {
                   : "Waiting for the next question…"}
               </p>
             ) : (
-              <ol className="flex flex-col gap-3 overflow-hidden">
+              <ol
+                data-testid="presenter-buzz-order"
+                className="flex flex-col gap-3 overflow-hidden"
+              >
                 {buzzOrder.map((entry) => {
                   const isActive =
                     entry.playerId === round?.activePlayerId &&

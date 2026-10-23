@@ -22,7 +22,7 @@ export function BuzzOrder({
   }
 
   return (
-    <ol className="flex flex-col gap-2">
+    <ol data-testid="buzz-order" className="flex flex-col gap-2">
       {buzzOrder.map((entry) => {
         const isActive = entry.playerId === activePlayerId && !entry.eliminated;
         const isMe = entry.playerId === myPlayerId;

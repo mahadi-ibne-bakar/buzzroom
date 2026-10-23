@@ -110,7 +110,10 @@ export function HostScreen() {
           <div className="text-slate-400 text-xs uppercase tracking-wider">
             Room code
           </div>
-          <div className="text-3xl font-bold tracking-widest text-white">
+          <div
+            data-testid="room-code"
+            className="text-3xl font-bold tracking-widest text-white"
+          >
             {room.roomCode}
           </div>
         </div>
